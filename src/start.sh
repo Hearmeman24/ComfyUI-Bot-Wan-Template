@@ -27,8 +27,21 @@ else
     jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
 fi
 
+FLAG_FILE="$NETWORK_VOLUME/.comfyui_initialized"
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
+
+if [ -f "$FLAG_FILE" ]; then
+  if [ "$enable_optimizations" = "false" ]; then
+    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
+else
+    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen --use-sage-attention
+    if [ $? -ne 0 ]; then
+        echo "ComfyUI failed with --use-sage-attention. Retrying without it..."
+        python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
+    fi
+fi
+fi
 
 # Set the target directory
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
@@ -256,10 +269,12 @@ nohup python3 "$NETWORK_VOLUME"/comfyui-discord-bot/worker.py > "$NETWORK_VOLUME
 echo "Starting ComfyUI"
 if [ "$enable_optimizations" = "false" ]; then
     python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
+    touch "$FLAG_FILE"
 else
     python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen --use-sage-attention
     if [ $? -ne 0 ]; then
         echo "ComfyUI failed with --use-sage-attention. Retrying without it..."
         python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
+        touch "$FLAG_FILE"
     fi
 fi
