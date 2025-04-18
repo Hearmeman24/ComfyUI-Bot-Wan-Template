@@ -59,10 +59,19 @@ echo "Downloading Triton"
 pip install triton
 fi
 
-if [ ! -d "comfyui-discord-bot" ]; then
-  git clone https://${GITHUB_PAT}@github.com/Hearmeman24/comfyui-discord-bot.git
-  cd /comfyui-discord-bot
-  pip install -r requirements.txt
+REPO_DIR="$NETWORK_VOLUME/comfyui-discord-bot"
+
+if [ ! -d "$REPO_DIR" ]; then
+  echo "Cloning bot into $REPO_DIR…"
+  git clone "https://${GITHUB_PAT}@github.com/Hearmeman24/comfyui-discord-bot.git" "$REPO_DIR"
+  echo "Clone complete"
+
+  echo "Installing Python deps…"
+  cd "$REPO_DIR"
+  pip install --upgrade -r requirements.txt
+  echo "Dependencies installed"
+
+  mv $REPO_DIR/Potrait01.png /$NETWORK_VOLUME/ComfyUI/input
   cd /
 fi
 
