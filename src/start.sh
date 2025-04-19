@@ -6,6 +6,33 @@ export LD_PRELOAD="${TCMALLOC}"
 
 set -eo pipefail
 set +u
+
+if [[ "${IS_DEV,,}" =~ ^(true|1|t|yes)$ ]]; then
+    API_URL="http://64.176.170.64:8000"  # Replace with your development API URL
+    echo "Using development API endpoint"
+else
+    API_URL="http://64.176.168.207:8000"  # Replace with your production API URL
+    echo "Using production API endpoint"
+fi
+
+URL="http://127.0.0.1:8188"
+
+# Function to report pod status
+report_status() {
+    local status=$1
+    local details=$2
+
+    echo "Reporting status: $details"
+
+    curl -X POST "${API_URL}/pods/$RUNPOD_POD_ID/status" \
+      -H "Content-Type: application/json" \
+      -H "x-api-key: ${API_KEY}" \
+      -d "{\"initialized\": $status, \"details\": \"$details\"}" \
+      --silent
+
+    echo "Status reported: $status - $details"
+}
+report_status false "Starting initialization"
 # Set the network volume path
 NETWORK_VOLUME="/workspace"
 
@@ -15,11 +42,11 @@ if [ ! -d "$NETWORK_VOLUME" ]; then
     echo "Settings network volume to $NETWORK_VOLUME"
 fi
 
-
 FLAG_FILE="$NETWORK_VOLUME/.comfyui_initialized"
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 REPO_DIR="$NETWORK_VOLUME/comfyui-discord-bot"
-URL="http://127.0.0.1:8188"
+
+
 
 sync_bot_repo() {
   # pick branch based on IS_DEV
@@ -88,6 +115,9 @@ if [ -f "$FLAG_FILE" ]; then
   echo "✅  ComfyUI is up! Starting worker!"
   nohup python3 "$NETWORK_VOLUME/comfyui-discord-bot/worker.py" \
     > "$NETWORK_VOLUME/worker.log" 2>&1 &
+
+  report_status true "Pod fully initialized and ready for processing"
+  echo "Initialization complete! Pod is ready to process jobs."
 
   # Wait on background jobs forever
   wait
@@ -277,5 +307,7 @@ until curl --silent --fail "$URL" --output /dev/null; do
 done
 echo "ComfyUI is UP Starting worker"
 nohup python3 "$NETWORK_VOLUME"/comfyui-discord-bot/worker.py > "$NETWORK_VOLUME"/worker.log 2>&1 &
+report_status true "Pod fully initialized and ready for processing"
+echo "Initialization complete! Pod is ready to process jobs."
 
 wait
