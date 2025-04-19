@@ -4,45 +4,99 @@
 TCMALLOC="$(ldconfig -p | grep -Po "libtcmalloc.so.\d" | head -n 1)"
 export LD_PRELOAD="${TCMALLOC}"
 
-# This is in case there's any special installs or overrides that needs to occur when starting the machine before starting ComfyUI
-if [ -f "/workspace/additional_params.sh" ]; then
-    chmod +x /workspace/additional_params.sh
-    echo "Executing additional_params.sh..."
-    /workspace/additional_params.sh
-else
-    echo "additional_params.sh not found in /workspace. Skipping..."
-fi
-
+set -eo pipefail
+set +u
 # Set the network volume path
 NETWORK_VOLUME="/workspace"
 
 # Check if NETWORK_VOLUME exists; if not, use root directory instead
 if [ ! -d "$NETWORK_VOLUME" ]; then
-    echo "NETWORK_VOLUME directory '$NETWORK_VOLUME' does not exist. You are NOT using a network volume. Setting NETWORK_VOLUME to '/' (root directory)."
     NETWORK_VOLUME="/"
-    echo "NETWORK_VOLUME directory doesn't exist. Starting JupyterLab on root directory..."
-    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/ &
-else
-    echo "NETWORK_VOLUME directory exists. Starting JupyterLab..."
-    jupyter-lab --ip=0.0.0.0 --allow-root --no-browser --NotebookApp.token='' --NotebookApp.password='' --ServerApp.allow_origin='*' --ServerApp.allow_credentials=True --notebook-dir=/workspace &
+    echo "Settings network volume to $NETWORK_VOLUME"
 fi
+
 
 FLAG_FILE="$NETWORK_VOLUME/.comfyui_initialized"
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
-WORKFLOW_DIR="$NETWORK_VOLUME/ComfyUI/user/default/workflows"
+REPO_DIR="$NETWORK_VOLUME/comfyui-discord-bot"
+URL="http://127.0.0.1:8188"
+
+sync_bot_repo() {
+  # pick branch based on IS_DEV
+  if [ "${IS_DEV:-false}" = "true" ]; then
+    BRANCH="dev"
+  else
+    BRANCH="master"
+  fi
+
+  echo "Syncing bot repo (branch: $BRANCH)…"
+  if [ ! -d "$REPO_DIR" ]; then
+    echo "Cloning '$BRANCH' into $REPO_DIR"
+    git clone --branch "$BRANCH" \
+      "https://${GITHUB_PAT}@github.com/Hearmeman24/comfyui-discord-bot.git" \
+      "$REPO_DIR"
+    echo "Clone complete"
+
+    echo "Installing Python deps…"
+    cd "$REPO_DIR"
+    pip install --upgrade -r requirements.txt
+    echo "Dependencies installed"
+    cd /
+  else
+    echo "Updating existing repo in $REPO_DIR"
+    cd "$REPO_DIR"
+    git fetch origin
+    git checkout "$BRANCH"
+    git pull origin "$BRANCH"
+
+    echo "🐍 Re‑installing any updated deps…"
+    pip install --upgrade -r requirements.txt
+    cd /
+  fi
+}
 
 if [ -f "$FLAG_FILE" ]; then
-  if [ "$enable_optimizations" = "false" ]; then
-    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
-else
-    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen --use-sage-attention
-    if [ $? -ne 0 ]; then
-        echo "ComfyUI failed with --use-sage-attention. Retrying without it..."
-        python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
+  echo "FLAG FILE FOUND"
+
+  # Add cd $NETWORK_VOLUME to shell startup if not already present
+  grep -qxF "cd $NETWORK_VOLUME" ~/.bashrc || echo "cd $NETWORK_VOLUME" >> ~/.bashrc
+  grep -qxF "cd $NETWORK_VOLUME" ~/.bash_profile || echo "cd $NETWORK_VOLUME" >> ~/.bash_profile
+
+  sync_bot_repo
+
+  echo "▶️  Starting ComfyUI"
+  # group both the main and fallback commands so they share the same log
+  nohup python3 "$NETWORK_VOLUME"/ComfyUI/main.py --listen > "$NETWORK_VOLUME"/comfyui_nohup.log 2>&1 &
+
+  echo "⏳  Waiting for ComfyUI to be up at $URL…"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "🔧 curl not found. Installing..."
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update && apt-get install -y curl
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y curl
+    else
+      echo "❌ No supported package manager found. Please install curl manually."
+      exit 1
     fi
-fi
+  fi
+  until curl --silent --fail "$URL" --output /dev/null; do
+    echo "🔄  Still waiting…"
+    sleep 2
+  done
+
+  echo "✅  ComfyUI is up! Starting worker!"
+  nohup python3 "$NETWORK_VOLUME/comfyui-discord-bot/worker.py" \
+    > "$NETWORK_VOLUME/worker.log" 2>&1 &
+
+  # Wait on background jobs forever
+  wait
+
+else
+  echo "NO FLAG FILE FOUND – starting initial setup"
 fi
 
+sync_bot_repo
 # Set the target directory
 CUSTOM_NODES_DIR="$NETWORK_VOLUME/ComfyUI/custom_nodes"
 
@@ -63,30 +117,12 @@ pip install onnxruntime-gpu
 
 
 if [ "$enable_optimizations" == "true" ]; then
-echo "Downloading SageAttention"
-git clone https://github.com/thu-ml/SageAttention.git
-cd SageAttention
-python3 setup.py install
-cd /
 echo "Downloading Triton"
 pip install triton
 fi
 
-REPO_DIR="$NETWORK_VOLUME/comfyui-discord-bot"
+# Determine which branch to use
 
-if [ ! -d "$REPO_DIR" ]; then
-  echo "Cloning bot into $REPO_DIR…"
-  git clone "https://${GITHUB_PAT}@github.com/Hearmeman24/comfyui-discord-bot.git" "$REPO_DIR"
-  echo "Clone complete"
-
-  echo "Installing Python deps…"
-  cd "$REPO_DIR"
-  pip install --upgrade -r requirements.txt
-  echo "Dependencies installed"
-
-  mv $REPO_DIR/Potrait01.png /$NETWORK_VOLUME/ComfyUI/input
-  cd /
-fi
 
 # Change to the directory
 cd "$CUSTOM_NODES_DIR" || exit 1
@@ -132,49 +168,16 @@ CLIP_VISION_DIR="$NETWORK_VOLUME/ComfyUI/models/clip_vision"
 VAE_DIR="$NETWORK_VOLUME/ComfyUI/models/vae"
 
 # Download 480p native models
-if [ "$download_480p_native_models" == "true" ]; then
-  echo "Downloading 480p native models..."
+echo "Downloading 480p native models..."
 
-  download_model "$DIFFUSION_MODELS_DIR" "wan2.1_i2v_480p_14B_bf16.safetensors" \
-    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors"
+download_model "$DIFFUSION_MODELS_DIR" "wan2.1_i2v_480p_14B_bf16.safetensors" \
+  "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors"
 
-  download_model "$DIFFUSION_MODELS_DIR" "wan2.1_t2v_14B_bf16.safetensors" \
-    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"
+download_model "$DIFFUSION_MODELS_DIR" "wan2.1_t2v_14B_bf16.safetensors" \
+  "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors"
 
-  download_model "$DIFFUSION_MODELS_DIR" "wan2.1_t2v_1.3B_fp16.safetensors" \
-    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
-fi
-
-# Handle full download (with SDXL)
-if [ "$download_wan_fun_and_sdxl_helper" == "true" ]; then
-  echo "Downloading Wan Fun 1.3B Model"
-
-  download_model "$DIFFUSION_MODELS_DIR" "Wan2.1-Fun-Control1.3B.safetensors" \
-    "alibaba-pai/Wan2.1-Fun-1.3B-Control" "diffusion_pytorch_model.safetensors"
-
-  echo "Downloading Wan Fun 14B Model"
-
-  download_model "$DIFFUSION_MODELS_DIR" "Wan2.1-Fun-Control14B.safetensors" \
-    "alibaba-pai/Wan2.1-Fun-14B-Control" "diffusion_pytorch_model.safetensors"
-
-  UNION_DIR="$NETWORK_VOLUME/ComfyUI/models/controlnet/SDXL/controlnet-union-sdxl-1.0"
-  mkdir -p "$UNION_DIR"
-  if [ ! -f "$UNION_DIR/diffusion_pytorch_model_promax.safetensors" ]; then
-    download_model "$UNION_DIR" "diffusion_pytorch_model_promax.safetensors" \
-    "xinsir/controlnet-union-sdxl-1.0" "diffusion_pytorch_model_promax.safetensors"
-  fi
-fi
-
-# Download 480p native models
-if [ "$download_480p_debug" == "true" ]; then
-  echo "Downloading 480p native models..."
-
-  download_model "$DIFFUSION_MODELS_DIR" "wan2.1_i2v_480p_14B_bf16.safetensors" \
-    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors"
-
-  download_model "$DIFFUSION_MODELS_DIR" "wan2.1_t2v_1.3B_fp16.safetensors" \
-    "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
-fi
+download_model "$DIFFUSION_MODELS_DIR" "wan2.1_t2v_1.3B_fp16.safetensors" \
+  "Comfy-Org/Wan_2.1_ComfyUI_repackaged" "split_files/diffusion_models/wan2.1_t2v_1.3B_fp16.safetensors"
 
 # Download text encoders
 echo "Downloading text encoders..."
@@ -242,12 +245,15 @@ for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
 
     for MODEL_ID in "${MODEL_IDS[@]}"; do
         echo "Downloading model: $MODEL_ID to $TARGET_DIR"
-        (cd "$TARGET_DIR" && download.py --model "$MODEL_ID")
+        (cd "$TARGET_DIR" && download.py --model "$MODEL_ID") || {
+            echo "ERROR: Failed to download model $MODEL_ID to $TARGET_DIR, continuing with next model..."
+        }
     done
 done
 
 # Workspace as main working directory
 echo "cd $NETWORK_VOLUME" >> ~/.bashrc
+echo "cd $NETWORK_VOLUME" >> ~/.bash_profile
 
 if [ ! -d "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes" ]; then
     cd $NETWORK_VOLUME/ComfyUI/custom_nodes
@@ -261,20 +267,15 @@ fi
 # Install dependencies
 pip install --no-cache-dir -r $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt
 
+echo "Starting ComfyUI"
+touch "$FLAG_FILE"
+nohup python3 "$NETWORK_VOLUME"/ComfyUI/main.py --listen > "$NETWORK_VOLUME"/comfyui_nohup.log 2>&1 &
 
-echo "Starting worker"
+until curl --silent --fail "$URL" --output /dev/null; do
+    echo "🔄  Still waiting…"
+    sleep 2
+done
+echo "ComfyUI is UP Starting worker"
 nohup python3 "$NETWORK_VOLUME"/comfyui-discord-bot/worker.py > "$NETWORK_VOLUME"/worker.log 2>&1 &
 
-# Start ComfyUI
-echo "Starting ComfyUI"
-if [ "$enable_optimizations" = "false" ]; then
-    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
-    touch "$FLAG_FILE"
-else
-    python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen --use-sage-attention
-    if [ $? -ne 0 ]; then
-        echo "ComfyUI failed with --use-sage-attention. Retrying without it..."
-        python3 "$NETWORK_VOLUME/ComfyUI/main.py" --listen
-        touch "$FLAG_FILE"
-    fi
-fi
+wait
