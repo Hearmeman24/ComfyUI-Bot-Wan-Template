@@ -18,7 +18,7 @@ fi
 URL="http://127.0.0.1:8188"
 
 # Function to report pod status
-report_status() {
+  report_status() {
     local status=$1
     local details=$2
 
@@ -34,14 +34,21 @@ report_status() {
 }
 report_status false "Starting initialization"
 # Set the network volume path
-NETWORK_VOLUME="/workspace"
-
-# Check if NETWORK_VOLUME exists; if not, use root directory instead
-if [ ! -d "$NETWORK_VOLUME" ]; then
+# Determine the network volume based on environment
+# Check if /workspace exists
+if [ -d "/workspace" ]; then
+    NETWORK_VOLUME="/workspace"
+# If not, check if /runpod-volume exists
+elif [ -d "/runpod-volume" ]; then
+    NETWORK_VOLUME="/runpod-volume"
+# Fallback to root if neither directory exists
+else
+    echo "Warning: Neither /workspace nor /runpod-volume exists, falling back to root directory"
     NETWORK_VOLUME="/"
-    echo "Settings network volume to $NETWORK_VOLUME"
 fi
 
+echo "Using NETWORK_VOLUME: $NETWORK_VOLUME"
+pip install runpod
 FLAG_FILE="$NETWORK_VOLUME/.comfyui_initialized"
 COMFYUI_DIR="$NETWORK_VOLUME/ComfyUI"
 REPO_DIR="$NETWORK_VOLUME/comfyui-discord-bot"
@@ -75,19 +82,11 @@ sync_bot_repo() {
     git fetch origin
     git checkout "$BRANCH"
     git pull origin "$BRANCH"
-
-    echo "🐍 Re‑installing any updated deps…"
-    pip install --upgrade -r requirements.txt
-    cd /
   fi
 }
 
 if [ -f "$FLAG_FILE" ]; then
   echo "FLAG FILE FOUND"
-
-  # Add cd $NETWORK_VOLUME to shell startup if not already present
-  grep -qxF "cd $NETWORK_VOLUME" ~/.bashrc || echo "cd $NETWORK_VOLUME" >> ~/.bashrc
-  grep -qxF "cd $NETWORK_VOLUME" ~/.bash_profile || echo "cd $NETWORK_VOLUME" >> ~/.bash_profile
 
   sync_bot_repo
 
@@ -254,19 +253,35 @@ fi
 
 echo "Finished downloading models!"
 
-declare -A MODEL_CATEGORIES=(
-    ["$NETWORK_VOLUME/ComfyUI/models/checkpoints"]="CHECKPOINT_IDS_TO_DOWNLOAD"
-    ["$NETWORK_VOLUME/ComfyUI/models/loras"]="LORAS_IDS_TO_DOWNLOAD"
+echo "Downloading LoRAs"
+
+mkdir -p "$NETWORK_VOLUME/ComfyUI/models/loras" && \
+(gdown "1IfTa_Z_SSDFz7x0ootJu293qsxf19FEZ" -O "$NETWORK_VOLUME/ComfyUI/models/loras/Wan_ClothesOnOff_Trend.safetensors" || \
+echo "Download failed for Wan_ClothesOnOff_Trend.safetensors, continuing...")
+
+
+
+declare -A MODEL_CATEGORY_FILES=(
+    ["$NETWORK_VOLUME/ComfyUI/models/checkpoints"]="$NETWORK_VOLUME/comfyui-discord-bot/downloads/checkpoint_to_download.txt"
+    ["$NETWORK_VOLUME/ComfyUI/models/loras"]="$NETWORK_VOLUME/comfyui-discord-bot/downloads/lora_to_download.txt"
 )
 
 # Ensure directories exist and download models
-for TARGET_DIR in "${!MODEL_CATEGORIES[@]}"; do
-    ENV_VAR_NAME="${MODEL_CATEGORIES[$TARGET_DIR]}"
-    MODEL_IDS_STRING="${!ENV_VAR_NAME}"  # Get the value of the environment variable
+for TARGET_DIR in "${!MODEL_CATEGORY_FILES[@]}"; do
+    CONFIG_FILE="${MODEL_CATEGORY_FILES[$TARGET_DIR]}"
 
-    # Skip if the environment variable is set to "ids_here"
-    if [ "$MODEL_IDS_STRING" == "replace_with_ids" ]; then
-        echo "Skipping downloads for $TARGET_DIR ($ENV_VAR_NAME is 'ids_here')"
+    # Skip if the file doesn't exist
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Skipping downloads for $TARGET_DIR (file $CONFIG_FILE not found)"
+        continue
+    fi
+
+    # Read comma-separated model IDs from the file
+    MODEL_IDS_STRING=$(cat "$CONFIG_FILE")
+
+    # Skip if the file is empty or contains placeholder text
+    if [ -z "$MODEL_IDS_STRING" ] || [ "$MODEL_IDS_STRING" == "replace_with_ids" ]; then
+        echo "Skipping downloads for $TARGET_DIR ($CONFIG_FILE is empty or contains placeholder)"
         continue
     fi
 
