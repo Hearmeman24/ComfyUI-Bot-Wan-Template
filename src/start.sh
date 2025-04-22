@@ -301,7 +301,7 @@ fi
 
 # Install dependencies
 pip install --no-cache-dir -r $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt
-
+touch "$FLAG_FILE"
 mkdir -p "$NETWORK_VOLUME/${RUNPOD_POD_ID}"
 nohup bash -c "python3 \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
 COMFY_PID=$!
