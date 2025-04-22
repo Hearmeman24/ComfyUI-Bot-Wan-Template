@@ -34,7 +34,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # SageAttention installation in a third step
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install git+https://github.com/thu-ml/SageAttention.git
+    git clone https://github.com/thu-ml/SageAttention.git && \
+    cd SageAttention && \
+    # 1) force the compute_capabilities so the egg_info hook never errors:
+    sed -i "s/^compute_capabilities = set()/compute_capabilities = {'8.9','9.0'}/" setup.py && \
+    # 2) comment out the entire GPU‑detect loop and the RuntimeError line:
+    sed -i "/for i in range(device_count)/,/raise RuntimeError/c\# patched out GPU autodetect" setup.py && \
+    # 3) install from this local directory (now metadata generation will succeed):
+    pip3 install . && \
+    cd .. && rm -rf SageAttention
 
 # ComfyUI installation with cache
 RUN --mount=type=cache,target=/root/.cache/pip \
