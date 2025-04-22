@@ -21,7 +21,7 @@ jobs:
           command: |
             docker build \
               --gpus all \
-              -t my‑org/my‑project:latest \
+              -t hearmeman/comfyui-discord-bot-wan:v5 \
               .
 
 workflows:
