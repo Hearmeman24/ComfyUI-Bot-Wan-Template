@@ -36,11 +36,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     git clone https://github.com/thu-ml/SageAttention.git && \
     cd SageAttention && \
-    # 1) force the compute_capabilities so the egg_info hook never errors:
+    # 1) force the exact SM versions you need:
     sed -i "s/^compute_capabilities = set()/compute_capabilities = {'8.9','9.0'}/" setup.py && \
-    # 2) comment out the entire GPU‑detect loop and the RuntimeError line:
-    sed -i "/for i in range(device_count)/,/raise RuntimeError/c\# patched out GPU autodetect" setup.py && \
-    # 3) install from this local directory (now metadata generation will succeed):
+    # 2) disable the runtime GPU‐detect loop entirely:
+    sed -i "s/^device_count = torch.cuda.device_count()/device_count = 0/" setup.py && \
+    # 3) install from the patched local directory:
     pip3 install . && \
     cd .. && rm -rf SageAttention
 
