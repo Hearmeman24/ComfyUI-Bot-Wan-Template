@@ -16,10 +16,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl ffmpeg ninja-build git git-lfs wget vim \
         libgl1 libglib2.0-0 build-essential gcc && \
     \
-    # install pip for 3.11
-    python3.11 -m ensurepip --upgrade && \
+    # install pip for Python-3.11 (ensurepip is disabled)
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 - && \
     \
-    # set 3.11 as the default python / pip
+    # make 3.11 the default `python` and `pip`
     ln -sf /usr/bin/python3.11 /usr/bin/python && \
     ln -sf "$(command -v pip3.11)" /usr/bin/pip && \
     \
