@@ -33,8 +33,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     ipykernel jupyterlab_code_formatter
 
 # SageAttention installation in a third step
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install git+https://github.com/thu-ml/SageAttention.git
+RUN --mount=type=gpu --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-build-isolation \
+        git+https://github.com/thu-ml/SageAttention.git
 
 # ComfyUI installation with cache
 RUN --mount=type=cache,target=/root/.cache/pip \
