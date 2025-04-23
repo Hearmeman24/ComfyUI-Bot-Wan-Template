@@ -1,0 +1,11 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - echo "[login] Docker Hub"
+      - echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USER" --password-stdin
+      - echo "[build] Docker image"
+      - docker build --build-arg DOCKER_BUILDKIT=1 \
+          -t docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:v4 .
+      - echo "[push] Docker image"
+      - docker push docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:v4
