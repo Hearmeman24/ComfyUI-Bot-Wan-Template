@@ -19,13 +19,14 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ln -sf /usr/bin/python3.12 /usr/bin/python && \
     ln -sf /usr/bin/pip3 /usr/bin/pip && \
     \
+    # Create and activate virtual environment
+    python3.12 -m venv /opt/venv && \
+    \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Use the virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
 
-# ------------------------------------------------------------
-# Python packages (all via pip3.11 / pip)
-# ------------------------------------------------------------
-# Torch nightly (CUDA 12.8)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --pre torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/nightly/cu128
@@ -48,7 +49,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         --cuda-version 12.8 --nvidia
 
 FROM base AS final
-RUN python -m pip install opencv-python
+# Make sure to use the virtual environment here too
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install opencv-python
 
 RUN for repo in \
     https://github.com/kijai/ComfyUI-KJNodes.git \
