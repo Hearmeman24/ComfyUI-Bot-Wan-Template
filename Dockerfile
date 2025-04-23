@@ -1,5 +1,5 @@
 # Use multi-stage build with caching optimizations
-FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04 AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -10,23 +10,21 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        python3.11 python3.11-venv python3.11-distutils python3.11-dev \
+        python3.12 python3.12-venv python3.12-distutils python3.12-dev \
+        python3-pip \
         curl ffmpeg ninja-build git git-lfs wget vim \
         libgl1 libglib2.0-0 build-essential gcc && \
     \
-    # install pip for Python-3.11 (ensurepip is disabled)
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 - && \
-    \
-    # make 3.11 the default `python` and `pip`
-    ln -sf /usr/bin/python3.11 /usr/bin/python && \
-    ln -sf "$(command -v pip3.11)" /usr/bin/pip && \
+    # ensure pip points to Python 3.12
+    ln -sf /usr/bin/python3.12 /usr/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/bin/pip && \
     \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------
 # Python packages (all via pip3.11 / pip)
 # ------------------------------------------------------------
-# Torch nightly (CUDA 12.6)
+# Torch nightly (CUDA 12.8)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --pre torch torchvision torchaudio \
         --index-url https://download.pytorch.org/whl/nightly/cu128
