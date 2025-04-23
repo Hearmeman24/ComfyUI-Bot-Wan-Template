@@ -6,7 +6,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
    PIP_PREFER_BINARY=1 \
    PYTHONUNBUFFERED=1 \
    CMAKE_BUILD_PARALLEL_LEVEL=8
-   PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/nightly/cu126"
 
 ENV TORCH_CUDA_ARCH_LIST="8.9;9.0"
 
