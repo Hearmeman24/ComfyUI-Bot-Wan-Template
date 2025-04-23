@@ -34,15 +34,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # SageAttention installation in a third step
 RUN --mount=type=cache,target=/root/.cache/pip \
-    git clone https://github.com/thu-ml/SageAttention.git && \
-    cd SageAttention && \
-    # 1) force the exact SM versions you need:
-    sed -i "s/^compute_capabilities = set()/compute_capabilities = {'8.9','9.0'}/" setup.py && \
-    # 2) disable the runtime GPU‐detect loop entirely:
-    sed -i "s/^device_count = torch.cuda.device_count()/device_count = 0/" setup.py && \
-    # 3) install from the patched local directory:
-    pip3 install . && \
-    cd .. && rm -rf SageAttention
+    pip3 install git+https://github.com/thu-ml/SageAttention.git
 
 # ComfyUI installation with cache
 RUN --mount=type=cache,target=/root/.cache/pip \
