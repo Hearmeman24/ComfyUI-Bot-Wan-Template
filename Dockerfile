@@ -44,13 +44,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         ipykernel jupyterlab_code_formatter
 
 # ------------------------------------------------------------
-# SageAttention pre-compiled wheel
-# ------------------------------------------------------------
-COPY sageattention-*.whl /tmp/
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install /tmp/sageattention-*.whl && rm /tmp/sageattention-*.whl
-
-# ------------------------------------------------------------
 # ComfyUI install
 # ------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
