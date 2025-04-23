@@ -10,7 +10,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ENV TORCH_CUDA_ARCH_LIST="8.9;9.0"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         python3.11 python3.11-venv python3.11-distutils python3.11-dev \
