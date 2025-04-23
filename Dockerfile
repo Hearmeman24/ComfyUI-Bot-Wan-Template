@@ -45,8 +45,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ComfyUI install
 # ------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /usr/bin/yes | comfy --workspace /ComfyUI install \
-        --cuda-version 12.8 --nvidia
+    /usr/bin/yes | comfy --workspace /ComfyUI install
 
 FROM base AS final
 # Make sure to use the virtual environment here too
