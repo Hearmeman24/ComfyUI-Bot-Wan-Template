@@ -39,7 +39,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Runtime libraries
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install gdown runpod triton comfy-cli jupyterlab jupyterlab-lsp \
+    pip install pyyaml gdown runpod triton comfy-cli jupyterlab jupyterlab-lsp \
         jupyter-server jupyter-server-terminals \
         ipykernel jupyterlab_code_formatter
 
