@@ -2,20 +2,12 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - export DOCKER_BUILDKIT=1               # (1)
-      - echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USER" --password-stdin
+      - export DOCKER_BUILDKIT=1                 # turn on BuildKit
+      - echo $DOCKERHUB_PAT | docker login -u $DOCKERHUB_USER --password-stdin
   build:
     commands:
       - docker build --progress=plain \
-          --build-arg BUILDKIT_INLINE_CACHE=1 \
-          -t docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:v4 .
+          -t docker.io/$DOCKERHUB_USER/comfyui-bot:v4 .
   post_build:
     commands:
-      - docker push docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:v4
-cache:
-  type: LOCAL
-  modes: [  # speeds up second-run massively
-    LOCAL_SOURCE_CACHE,
-    LOCAL_DOCKER_LAYER_CACHE,
-    LOCAL_CUSTOM_CACHE
-  ]
+      - docker push docker.io/$DOCKERHUB_USER/comfyui-bot:v4
