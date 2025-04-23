@@ -1,13 +1,11 @@
 # Use multi-stage build with caching optimizations
-FROM nvidia/cuda:12.6.0-cudnn-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu22.04 AS base
 
 # Consolidated environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
    PIP_PREFER_BINARY=1 \
    PYTHONUNBUFFERED=1 \
    CMAKE_BUILD_PARALLEL_LEVEL=8
-
-ENV TORCH_CUDA_ARCH_LIST="8.9;9.0"
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && \
@@ -31,7 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Torch nightly (CUDA 12.6)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --pre torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/nightly/cu126
+        --index-url https://download.pytorch.org/whl/nightly/cu128
 
 # Core Python tooling
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -48,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ------------------------------------------------------------
 RUN --mount=type=cache,target=/root/.cache/pip \
     /usr/bin/yes | comfy --workspace /ComfyUI install \
-        --cuda-version 12.6 --nvidia
+        --cuda-version 12.8 --nvidia
 
 FROM base AS final
 RUN python -m pip install opencv-python
