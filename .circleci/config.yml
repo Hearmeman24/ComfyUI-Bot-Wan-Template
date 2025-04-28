@@ -35,6 +35,6 @@ workflows:
           context: docker-hub
           filters:
             tags:
-              only: /^v[0-9]+(\.[0-9]+)*$/   # run on tags like v5 or v1.2.3
+              only: /^v.*$/   # run on tags like v5 or v1.2.3
             branches:
               ignore: /.*/
