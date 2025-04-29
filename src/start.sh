@@ -16,13 +16,49 @@ else
 fi
 
 echo "== System Information =="
-python --version
-pip --version
-echo "PyTorch version: $(python -c 'import torch; print(torch.__version__)')"
-echo "CUDA available: $(python -c 'import torch; print(torch.cuda.is_available())')"
-echo "Python executable path: $(which python)"
-echo "Checking SageAttention installation..."
-python -c "import sageattention; print('SageAttention imported successfully')"
+
+# Python version check
+if command -v python &> /dev/null; then
+    python --version || echo "Failed to get Python version"
+else
+    echo "Python not found"
+fi
+
+# Pip version check
+if command -v pip &> /dev/null; then
+    pip --version || echo "Failed to get pip version"
+else
+    echo "pip not found"
+fi
+
+# PyTorch check
+python -c "
+try:
+    import torch
+    print(f'PyTorch version: {torch.__version__}')
+    print(f'CUDA available: {torch.cuda.is_available()}')
+except Exception as e:
+    print('Failed to get PyTorch information:', str(e))
+" || echo "Failed to run PyTorch check"
+
+# Python path check
+if command -v which &> /dev/null; then
+    which python || echo "Failed to get Python path"
+else
+    echo "which command not available"
+fi
+
+# SageAttention check
+python -c "
+try:
+    import sageattention
+    print('SageAttention imported successfully')
+except ImportError:
+    print('SageAttention not found')
+except Exception as e:
+    print('Error checking SageAttention:', str(e))
+" || echo "Failed to run SageAttention check"
+
 echo "== End System Information =="
 
 URL="http://127.0.0.1:8188"
