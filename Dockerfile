@@ -7,35 +7,38 @@ ENV DEBIAN_FRONTEND=noninteractive \
    PYTHONUNBUFFERED=1 \
    CMAKE_BUILD_PARALLEL_LEVEL=8
 
-# Consolidated installation to reduce layers
+# Install Python 3.10 specifically and make it the default
 RUN apt-get update && apt-get install -y --no-install-recommends \
-   python3.11 python3-pip curl ffmpeg ninja-build git git-lfs wget vim libgl1 libglib2.0-0 \
-   python3-dev build-essential gcc \
-   && ln -sf /usr/bin/python3.11 /usr/bin/python \
-   && ln -sf /usr/bin/pip3 /usr/bin/pip \
+   python3.10 python3.10-dev python3.10-distutils python3-pip curl ffmpeg ninja-build \
+   git git-lfs wget vim libgl1 libglib2.0-0 build-essential gcc \
+   && ln -sf /usr/bin/python3.10 /usr/bin/python \
+   && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+   && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10 \
+   && ln -sf /usr/local/bin/pip /usr/bin/pip \
+   && ln -sf /usr/local/bin/pip /usr/bin/pip3 \
    && apt-get clean \
    && rm -rf /var/lib/apt/lists/*
 
-# First install the SPECIFIC torch version you need
-# This establishes it as the base version that other packages will use
-RUN pip install --no-cache-dir torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
+# Verify Python version
+RUN python --version && pip --version
 
-# Use build cache for pip installations - but do NOT install any conflicting torch versions
-RUN pip install --no-cache-dir gdown runpod packaging setuptools wheel comfy-cli jupyterlab jupyterlab-lsp \
-    jupyter-server jupyter-server-terminals \
-    ipykernel jupyterlab_code_formatter
+# Install the specific torch version first
+RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
 
-# Prevent comfy from installing its own torch version by setting environment variables
-ENV TORCH_CUDA_ARCH_LIST="8.9" \
-    COMFYUI_SKIP_TORCH_INSTALL=1
+# Create a constraint file to prevent torch upgrades
+RUN echo "torch==2.6.0+cu124" > /torch-constraint.txt
 
-# Install ComfyUI but skip torch installation
+# Install other packages with the constraint
+RUN pip install --no-cache-dir gdown runpod packaging setuptools wheel --constraint /torch-constraint.txt
+
+# Install ComfyUI with specific flags to avoid torch conflicts
+RUN pip install --no-cache-dir comfy-cli --constraint /torch-constraint.txt
 RUN /usr/bin/yes | comfy --workspace /ComfyUI install --cuda-version 12.4 --nvidia
 
 FROM base AS final
-RUN python -m pip install opencv-python
+RUN pip install opencv-python --constraint /torch-constraint.txt
 
-# Install custom nodes
+# Install custom nodes with constraint to prevent torch upgrades
 RUN for repo in \
     https://github.com/kijai/ComfyUI-KJNodes.git \
     https://github.com/rgthree/rgthree-comfy.git \
@@ -54,16 +57,15 @@ RUN for repo in \
             git clone "$repo"; \
         fi; \
         if [ -f "/ComfyUI/custom_nodes/$repo_dir/requirements.txt" ]; then \
-            # Modify requirements files to prevent torch installations
-            sed -i '/torch/d' "/ComfyUI/custom_nodes/$repo_dir/requirements.txt"; \
-            pip install -r "/ComfyUI/custom_nodes/$repo_dir/requirements.txt"; \
+            # Install requirements with the torch constraint
+            pip install -r "/ComfyUI/custom_nodes/$repo_dir/requirements.txt" --constraint /torch-constraint.txt; \
         fi; \
         if [ -f "/ComfyUI/custom_nodes/$repo_dir/install.py" ]; then \
             python "/ComfyUI/custom_nodes/$repo_dir/install.py"; \
         fi; \
     done
 
-# Re-install torch at the end to ensure it's the final version
+# Ensure torch version is correct at the end by force reinstalling
 RUN pip uninstall -y torch torchvision torchaudio
 RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124 --no-deps
 
@@ -71,8 +73,12 @@ RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/
 COPY sageattention-2.1.1-cp310-cp310-linux_x86_64.whl /tmp/
 RUN pip install /tmp/sageattention-2.1.1-cp310-cp310-linux_x86_64.whl
 
-# Verify torch version
-RUN python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
+# Install jupyterlab AFTER SageAttention to avoid package conflicts
+RUN pip install jupyterlab jupyterlab-lsp jupyter-server jupyter-server-terminals \
+    ipykernel jupyterlab_code_formatter --constraint /torch-constraint.txt
+
+# Verify Python and PyTorch version
+RUN python -c "import sys; print('Python version:', sys.version); import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
 
 COPY src/start_script.sh /start_script.sh
 RUN chmod +x /start_script.sh
