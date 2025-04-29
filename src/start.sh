@@ -263,12 +263,6 @@ fi
 
 echo "Finished downloading models!"
 
-echo "Downloading LoRAs"
-
-mkdir -p "$NETWORK_VOLUME/ComfyUI/models/loras" && \
-(gdown "1IfTa_Z_SSDFz7x0ootJu293qsxf19FEZ" -O "$NETWORK_VOLUME/ComfyUI/models/loras/Wan_ClothesOnOff_Trend.safetensors" || \
-echo "Download failed for Wan_ClothesOnOff_Trend.safetensors, continuing...")
-
 
 
 declare -A MODEL_CATEGORY_FILES=(
