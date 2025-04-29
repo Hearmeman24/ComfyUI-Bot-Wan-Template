@@ -16,21 +16,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
    && apt-get clean \
    && rm -rf /var/lib/apt/lists/*
 
-# Use build cache for pip installations
+# First install the SPECIFIC torch version you need
+# This establishes it as the base version that other packages will use
+RUN pip install --no-cache-dir torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
+
+# Use build cache for pip installations - but do NOT install any conflicting torch versions
 RUN pip install --no-cache-dir gdown runpod packaging setuptools wheel comfy-cli jupyterlab jupyterlab-lsp \
     jupyter-server jupyter-server-terminals \
     ipykernel jupyterlab_code_formatter
-EXPOSE 8888
 
-COPY sageattention-2.1.1-cp310-cp310-linux_x86_64.whl /tmp/
-RUN pip install /tmp/sageattention-2.1.1-cp310-cp310-linux_x86_64.whl
+# Prevent comfy from installing its own torch version by setting environment variables
+ENV TORCH_CUDA_ARCH_LIST="8.9" \
+    COMFYUI_SKIP_TORCH_INSTALL=1
 
+# Install ComfyUI but skip torch installation
 RUN /usr/bin/yes | comfy --workspace /ComfyUI install \
-   --cuda-version 12.4 --nvidia
+   --skip-torch --cuda-version 12.4 --nvidia
 
 FROM base AS final
 RUN python -m pip install opencv-python
 
+# Install custom nodes
 RUN for repo in \
     https://github.com/kijai/ComfyUI-KJNodes.git \
     https://github.com/rgthree/rgthree-comfy.git \
@@ -49,6 +55,8 @@ RUN for repo in \
             git clone "$repo"; \
         fi; \
         if [ -f "/ComfyUI/custom_nodes/$repo_dir/requirements.txt" ]; then \
+            # Modify requirements files to prevent torch installations
+            sed -i '/torch/d' "/ComfyUI/custom_nodes/$repo_dir/requirements.txt"; \
             pip install -r "/ComfyUI/custom_nodes/$repo_dir/requirements.txt"; \
         fi; \
         if [ -f "/ComfyUI/custom_nodes/$repo_dir/install.py" ]; then \
@@ -56,8 +64,20 @@ RUN for repo in \
         fi; \
     done
 
+# Re-install torch at the end to ensure it's the final version
+RUN pip uninstall -y torch torchvision torchaudio
+RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124 --no-deps
+
+# Install SageAttention after ensuring the correct torch version
+COPY sageattention-2.1.1-cp310-cp310-linux_x86_64.whl /tmp/
+RUN pip install /tmp/sageattention-2.1.1-cp310-cp310-linux_x86_64.whl
+
+# Verify torch version
+RUN python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())"
+
 COPY src/start_script.sh /start_script.sh
 RUN chmod +x /start_script.sh
 COPY 4xLSDIR.pth /4xLSDIR.pth
 
+EXPOSE 8888
 CMD ["/start_script.sh"]
