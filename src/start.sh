@@ -15,6 +15,52 @@ else
     echo "Using production API endpoint"
 fi
 
+echo "== System Information =="
+
+# Python version check
+if command -v python &> /dev/null; then
+    python --version || echo "Failed to get Python version"
+else
+    echo "Python not found"
+fi
+
+# Pip version check
+if command -v pip &> /dev/null; then
+    pip --version || echo "Failed to get pip version"
+else
+    echo "pip not found"
+fi
+
+# PyTorch check
+python -c "
+try:
+    import torch
+    print(f'PyTorch version: {torch.__version__}')
+    print(f'CUDA available: {torch.cuda.is_available()}')
+except Exception as e:
+    print('Failed to get PyTorch information:', str(e))
+" || echo "Failed to run PyTorch check"
+
+# Python path check
+if command -v which &> /dev/null; then
+    which python || echo "Failed to get Python path"
+else
+    echo "which command not available"
+fi
+
+# SageAttention check
+python -c "
+try:
+    import sageattention
+    print('SageAttention imported successfully')
+except ImportError:
+    print('SageAttention not found')
+except Exception as e:
+    print('Error checking SageAttention:', str(e))
+" || echo "Failed to run SageAttention check"
+
+echo "== End System Information =="
+
 URL="http://127.0.0.1:8188"
 
 # Function to report pod status
@@ -105,7 +151,7 @@ if [ -f "$FLAG_FILE" ]; then
   echo "▶️  Starting ComfyUI"
   # group both the main and fallback commands so they share the same log
   mkdir -p "$NETWORK_VOLUME/${RUNPOD_POD_ID}"
-  nohup bash -c "python3 \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
+  nohup bash -c "/usr/bin/python \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
 
   until curl --silent --fail "$URL" --output /dev/null; do
       echo "🔄  Still waiting…"
@@ -113,7 +159,7 @@ if [ -f "$FLAG_FILE" ]; then
   done
 
   echo "ComfyUI is UP Starting worker"
-  nohup bash -c "python3 \"$REPO_DIR\"/worker.py 2>&1 | tee \"$NETWORK_VOLUME\"/\"$RUNPOD_POD_ID\"/worker.log" &
+  nohup bash -c "/usr/bin/python \"$REPO_DIR\"/worker.py 2>&1 | tee \"$NETWORK_VOLUME\"/\"$RUNPOD_POD_ID\"/worker.log" &
 
   report_status true "Pod fully initialized and ready for processing"
   echo "Initialization complete! Pod is ready to process jobs."
@@ -253,12 +299,6 @@ fi
 
 echo "Finished downloading models!"
 
-echo "Downloading LoRAs"
-
-mkdir -p "$NETWORK_VOLUME/ComfyUI/models/loras" && \
-(gdown "1IfTa_Z_SSDFz7x0ootJu293qsxf19FEZ" -O "$NETWORK_VOLUME/ComfyUI/models/loras/Wan_ClothesOnOff_Trend.safetensors" || \
-echo "Download failed for Wan_ClothesOnOff_Trend.safetensors, continuing...")
-
 
 
 declare -A MODEL_CATEGORY_FILES=(
@@ -314,7 +354,7 @@ pip install --no-cache-dir -r $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-KJNod
 echo "Starting ComfyUI"
 touch "$FLAG_FILE"
 mkdir -p "$NETWORK_VOLUME/${RUNPOD_POD_ID}"
-nohup bash -c "python3 \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
+nohup bash -c "/usr/bin/python \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
 COMFY_PID=$!
 
 until curl --silent --fail "$URL" --output /dev/null; do
@@ -323,7 +363,7 @@ until curl --silent --fail "$URL" --output /dev/null; do
 done
 
 echo "ComfyUI is UP Starting worker"
-nohup bash -c "python3 \"$REPO_DIR\"/worker.py 2>&1 | tee \"$NETWORK_VOLUME\"/\"$RUNPOD_POD_ID\"/worker.log" &
+nohup bash -c "/usr/bin/python \"$REPO_DIR\"/worker.py 2>&1 | tee \"$NETWORK_VOLUME\"/\"$RUNPOD_POD_ID\"/worker.log" &
 WORKER_PID=$!
 
 report_status true "Pod fully initialized and ready for processing"

@@ -5,9 +5,11 @@ executors:
   docker-dind:
     # machine executor gives you full Docker daemon + BuildKit
     machine:
-      image: ubuntu-2204:current        # CircleCI’s stock Ubuntu image
+      image: ubuntu-2204:current
+      docker_layer_caching: true
     environment:
-      DOCKER_BUILDKIT: 1                # enable BuildKit everywhere
+      DOCKER_BUILDKIT: 1
+      COMPOSE_DOCKER_CLI_BUILD: 1 # enable BuildKit everywhere
 
 jobs:
   build_and_push:
@@ -15,17 +17,34 @@ jobs:
     steps:
       - checkout
 
+      # Pull last build’s cache (ignore if it does not exist)
+      - run:
+          name: Pre-pull cache image
+          command: |
+            docker pull "docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:buildcache" || true
+
       - run:
           name: Log in to Docker Hub
           command: |
             echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
       - run:
-          name: Build & push
+          name: Build & push with cache
           command: |
             TAG="${CIRCLE_TAG:-latest}"
-            docker build --progress=plain -t "docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:${TAG}" .
-            docker push "docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan:${TAG}"
+            IMG="docker.io/$DOCKERHUB_USER/comfyui-discord-bot-wan"
+
+            docker build \
+              --progress=plain \
+              --build-arg BUILDKIT_INLINE_CACHE=1 \
+              --cache-from "${IMG}:buildcache" \
+              -t "${IMG}:${TAG}" .
+
+            docker push "${IMG}:${TAG}"
+
+            # refresh the cache tag for next build
+            docker tag "${IMG}:${TAG}" "${IMG}:buildcache"
+            docker push "${IMG}:buildcache"
 
 workflows:
   version: 2
@@ -35,6 +54,6 @@ workflows:
           context: docker-hub
           filters:
             tags:
-              only: /^v[0-9]+(\.[0-9]+)*$/   # run on tags like v5 or v1.2.3
+              only: /^v.*$/   # run on tags like v5 or v1.2.3
             branches:
               ignore: /.*/
