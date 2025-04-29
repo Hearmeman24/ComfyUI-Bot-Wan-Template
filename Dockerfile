@@ -28,7 +28,7 @@ RUN pip install torchvision==0.21.0+cu124 torchaudio==2.6.0 --index-url https://
 
 # Create a constraint file to prevent torch upgrades
 RUN echo "torch==2.6.0+cu124" > /torch-constraint.txt
-RUN echo "torchvision=0.21.0+cu124" >> /torch-constraint.txt
+RUN echo "torchvision==0.21.0+cu124" >> /torch-constraint.txt
 RUN echo "torchaudio==2.6.0" >> /torch-constraint.txt
 
 # Install other packages with the constraint
