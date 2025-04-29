@@ -15,6 +15,14 @@ else
     echo "Using production API endpoint"
 fi
 
+echo "== System Information =="
+python --version
+pip --version
+echo "PyTorch version: $(python -c 'import torch; print(torch.__version__)')"
+echo "CUDA available: $(python -c 'import torch; print(torch.cuda.is_available())')"
+echo "Python executable path: $(which python)"
+echo "== End System Information =="
+
 URL="http://127.0.0.1:8188"
 
 # Function to report pod status
