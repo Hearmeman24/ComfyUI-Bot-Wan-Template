@@ -24,7 +24,7 @@ RUN python --version && pip --version
 
 # Install the specific torch version first
 RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124 --no-deps
-RUN pip install torchvision=0.21.0+cu124 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install torchvision==0.21.0+cu124 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
 # Create a constraint file to prevent torch upgrades
 RUN echo "torch==2.6.0+cu124" > /torch-constraint.txt
@@ -71,7 +71,7 @@ RUN for repo in \
 # Ensure torch version is correct at the end by force reinstalling
 RUN pip uninstall -y torch torchvision torchaudio
 RUN pip install torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124 --no-deps
-RUN pip install torchvision=0.21.0+cu124 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+RUN pip install torchvision==0.21.0+cu124 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
 # Install SageAttention after ensuring the correct torch version
 COPY sageattention-2.1.1-cp310-cp310-linux_x86_64.whl /tmp/
