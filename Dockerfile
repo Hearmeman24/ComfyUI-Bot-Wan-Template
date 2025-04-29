@@ -30,8 +30,7 @@ ENV TORCH_CUDA_ARCH_LIST="8.9" \
     COMFYUI_SKIP_TORCH_INSTALL=1
 
 # Install ComfyUI but skip torch installation
-RUN /usr/bin/yes | comfy --workspace /ComfyUI install \
-   --skip-torch --cuda-version 12.4 --nvidia
+RUN /usr/bin/yes | comfy --workspace /ComfyUI install --cuda-version 12.4 --nvidia
 
 FROM base AS final
 RUN python -m pip install opencv-python
