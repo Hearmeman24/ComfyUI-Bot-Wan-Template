@@ -8,10 +8,10 @@ set -eo pipefail
 set +u
 
 if [[ "${IS_DEV,,}" =~ ^(true|1|t|yes)$ ]]; then
-    API_URL="http://64.176.170.64:8000"  # Replace with your development API URL
+    API_URL="https://comfyui-job-api-dev.fly.dev"  # Replace with your development API URL
     echo "Using development API endpoint"
 else
-    API_URL="http://64.176.168.207:8000"  # Replace with your production API URL
+    API_URL="https://comfyui-job-api-prod.fly.dev"  # Replace with your production API URL
     echo "Using production API endpoint"
 fi
 
