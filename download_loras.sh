@@ -35,7 +35,7 @@ download_file() {
     # Try to check if URL exists
     curl -s --head "https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url" | head -n 1 | tee -a $LOG_FILE
     return 1
-  }
+  fi
 }
 
 echo "=== Starting downloads at $(date) ===" | tee -a $LOG_FILE
