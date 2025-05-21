@@ -56,7 +56,9 @@ file_list=(
   "orgasm_e60.safetensors"
   "wan_missionary_side.safetensors"
   "dicks_epoch_100.safetensors"
-  "masturbation_cumshot_wanI2V480p_v1.safetensors"
+  "masturbation_cumshot_v1.1_e310.safetensors"
+  "T2V - POV Handjob - 14b.safetensors"
+  "T2V - Insta Girls v3 - 14b.safetensors"
   "r0und4b0ut-wan-v1.0.safetensors"
   "facials_epoch_50.safetensors"
   "deepthroat_epoch_80.safetensors"
@@ -74,7 +76,7 @@ file_list=(
   "Su_Bl_Ep02-Wan.safetensors"
   "wan_female_masturbation.safetensors"
   "Wan-Hip_Slammin_Assertive_Cowgirl.safetensors"
-  "T2V - Skinny Petite Instagram Women - 14B.safetensors"
+  "analFromBehind_T2V_e100.safetensors"
   "T2V-jiggle_tits-14b.safetensors"
 )
 
