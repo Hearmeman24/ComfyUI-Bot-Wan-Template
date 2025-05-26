@@ -68,7 +68,7 @@ file_list=(
   "dicks_epoch_100.safetensors"
   "masturbation_cumshot_v1.1_e310.safetensors"
   "T2V - POV Handjob - 14b.safetensors"
-  "T2V - Insta Girls v3 - 14b.safetensors"
+  "instagram_girls.safetensors"
   "r0und4b0ut-wan-v1.0.safetensors"
   "facials_epoch_50.safetensors"
   "deepthroat_epoch_80.safetensors"
