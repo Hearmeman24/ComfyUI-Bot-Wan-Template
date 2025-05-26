@@ -16,19 +16,25 @@ download_file() {
   # URL encode spaces
   encoded_url="${filename// /%20}"
   remote="https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url"
+  output_dir="/models/loras"
+  full_path="$output_dir/$filename"
 
   echo "Downloading $filename with aria2c..." | tee -a "$LOG_FILE"
+
+  # Ensure output directory exists
+  mkdir -p "$output_dir"
+
   aria2c \
-    -x16 -s16 \           # 16 connections
-    --retry-wait=5 \      # wait 5s between retries
-    --max-tries=3 \       # retry up to 3 times
-    --dir=/models/loras \
+    -x16 -s16 \
+    --retry-wait=5 \
+    --max-tries=3 \
+    --dir="$output_dir" \
     --out="$filename" \
     "$remote" 2>&1 | tee -a "$LOG_FILE"
 
   if [ "${PIPESTATUS[0]}" -eq 0 ]; then
     echo "✅ Successfully downloaded $filename" | tee -a "$LOG_FILE"
-    filesize=$(stat -c%s "$filename")
+    filesize=$(stat -c%s "$full_path")
     echo "   File size: $filesize bytes" | tee -a "$LOG_FILE"
     if [ "$filesize" -lt 1000 ]; then
       echo "   ⚠️ WARNING: File seems very small, might be corrupt or incomplete" | tee -a "$LOG_FILE"
@@ -36,8 +42,8 @@ download_file() {
     return 0
   else
     echo "❌ Failed to download $filename" | tee -a "$LOG_FILE"
-    # Check existence
-    curl -sI "$remote" | head -n 5 | tee -a "$LOG_FILE"
+    echo "Checking if file exists on server..." | tee -a "$LOG_FILE"
+    curl -sI "$remote" | head -n 3 | tee -a "$LOG_FILE"
     return 1
   fi
 }
