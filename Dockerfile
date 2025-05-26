@@ -53,26 +53,29 @@ RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/
 
 # Download models with aria2
 RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_i2v_480p_14B_bf16.safetensors \
-    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors && \
-    aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_14B_bf16.safetensors \
-    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors && \
-    aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_vace_1.3B_preview_fp16.safetensors \
-    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_1.3B_preview_fp16.safetensors && \
-    aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_1.3B_bf16.safetensors \
+    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors
+RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_14B_bf16.safetensors \
+    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors
+RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_vace_1.3B_preview_fp16.safetensors \
+    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_1.3B_preview_fp16.safetensors
+RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_1.3B_bf16.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_1.3B_bf16.safetensors
 
+# Text encoders
 RUN aria2c -x16 -s16 -d /models/text_encoders -o umt5-xxl-enc-bf16.safetensors \
-    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/umt5-xxl-enc-bf16.safetensors && \
-    aria2c -x16 -s16 -d /models/text_encoders -o open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors \
-    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors && \
-    aria2c -x16 -s16 -d /models/text_encoders -o umt5_xxl_fp8_e4m3fn_scaled.safetensors \
+    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/umt5-xxl-enc-bf16.safetensors
+RUN aria2c -x16 -s16 -d /models/text_encoders -o open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors \
+    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/open-clip-xlm-roberta-large-vit-huge-14_visual_fp16.safetensors
+RUN aria2c -x16 -s16 -d /models/text_encoders -o umt5_xxl_fp8_e4m3fn_scaled.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
 
+# Variational Autoencoders (VAE)
 RUN aria2c -x16 -s16 -d /models/vae -o Wan2_1_VAE_bf16.safetensors \
-    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors && \
-    aria2c -x16 -s16 -d /models/vae -o wan_2.1_vae.safetensors \
+    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan2_1_VAE_bf16.safetensors
+RUN aria2c -x16 -s16 -d /models/vae -o wan_2.1_vae.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
 
+# CLIP vision model
 RUN aria2c -x16 -s16 -d /models/clip_vision -o clip_vision_h.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
 
