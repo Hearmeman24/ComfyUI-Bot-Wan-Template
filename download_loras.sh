@@ -1,39 +1,43 @@
 #!/bin/bash
 # Create log file
 LOG_FILE="/tmp/lora_download.log"
-echo "Starting LoRA downloads at $(date)" > $LOG_FILE
+echo "Starting LoRA downloads at $(date)" > "$LOG_FILE"
 
 # Create directory if it doesn't exist
 mkdir -p /models/loras
 cd /models/loras || {
-  echo "ERROR: Failed to cd to /models/loras directory" | tee -a $LOG_FILE
+  echo "ERROR: Failed to cd to /models/loras directory" | tee -a "$LOG_FILE"
   exit 1
 }
 
 # Function to download a file with proper URL encoding
 download_file() {
   filename="$1"
-  # URL encode the filename for the URL
-  encoded_url=$(echo "$filename" | sed -e "s/ /%20/g")
-  echo "Downloading $filename..." | tee -a $LOG_FILE
+  # URL encode spaces
+  encoded_url="${filename// /%20}"
+  remote="https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url"
 
-  # Download with retries, showing progress, and logging
-  wget -t 3 -O "$filename" "https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url" 2>&1 | tee -a $LOG_FILE
+  echo "Downloading $filename with aria2c..." | tee -a "$LOG_FILE"
+  aria2c \
+    -x16 -s16 \           # 16 connections
+    --retry-wait=5 \      # wait 5s between retries
+    --max-tries=3 \       # retry up to 3 times
+    --dir=/models/loras \
+    --out="$filename" \
+    "$remote" 2>&1 | tee -a "$LOG_FILE"
 
-  # Check status
-  if [ ${PIPESTATUS[0]} -eq 0 ]; then
-    echo "✅ Successfully downloaded $filename" | tee -a $LOG_FILE
-    # Verify file size
+  if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+    echo "✅ Successfully downloaded $filename" | tee -a "$LOG_FILE"
     filesize=$(stat -c%s "$filename")
-    echo "   File size: $filesize bytes" | tee -a $LOG_FILE
+    echo "   File size: $filesize bytes" | tee -a "$LOG_FILE"
     if [ "$filesize" -lt 1000 ]; then
-      echo "   ⚠️ WARNING: File seems very small, might be corrupt or incomplete" | tee -a $LOG_FILE
+      echo "   ⚠️ WARNING: File seems very small, might be corrupt or incomplete" | tee -a "$LOG_FILE"
     fi
     return 0
   else
-    echo "❌ Failed to download $filename" | tee -a $LOG_FILE
-    # Try to check if URL exists
-    curl -s --head "https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url" | head -n 1 | tee -a $LOG_FILE
+    echo "❌ Failed to download $filename" | tee -a "$LOG_FILE"
+    # Check existence
+    curl -sI "$remote" | head -n 5 | tee -a "$LOG_FILE"
     return 1
   fi
 }
@@ -78,6 +82,13 @@ file_list=(
   "Wan-Hip_Slammin_Assertive_Cowgirl.safetensors"
   "analFromBehind_T2V_e100.safetensors"
   "T2V-jiggle_tits-14b.safetensors"
+  "analFromBehind_T2V_e100.safetensors"
+  "T2V - POV Handjob - 14b.safetensors"
+  "masturbation_cumshot_v1.1_e310.safetensors"
+  "jfj-deepthroat-v1.safetensors"
+  "wan-t2v-anal-reverse-cowgirl-e54.safetensors"
+  "spanking_for_wan_v1_e128.safetensors"
+  "tongue kiss.safetensors"
 )
 
 # Process each file
