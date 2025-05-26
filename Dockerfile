@@ -119,8 +119,13 @@ RUN for repo in \
 
 # SageAttention and other Python deps
 RUN pip install --no-cache-dir \
-    https://raw.githubusercontent.com/Hearmeman24/upscalers/master/sageattention-2.1.1-cp312-cp312-linux_x86_64.whl && \
-    discord.py==2.5.2 python-dotenv==1.1.0 Requests==2.32.3 websocket_client==1.8.0 "httpx[http2]"
+    https://raw.githubusercontent.com/Hearmeman24/upscalers/master/sageattention-2.1.1-cp312-cp312-linux_x86_64.whl
+
+RUN pip install --no-cache-dir discord.py==2.5.2 \
+                              python-dotenv==1.1.0 \
+                              Requests==2.32.3 \
+                              websocket_client==1.8.0 \
+                              "httpx[http2]"
 
 # Frame Interp checkpoint
 RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film/ && \
