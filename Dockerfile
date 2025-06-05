@@ -82,6 +82,9 @@ RUN aria2c -x16 -s16 -d /models/clip_vision -o clip_vision_h.safetensors \
 RUN aria2c -x16 -s16 -d /models/loras -o Wan21_CausVid_14B_T2V_lora_rank32.safetensors \
     https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32.safetensors
 
+RUN aria2c -x16 -s16 -d /models/loras -o Wan21_CausVid_14B_T2V_lora_rank32_v2.safetensors \
+    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32_v2.safetensors
+
 # Upscalers
 RUN git clone https://github.com/Hearmeman24/upscalers.git /tmp/upscalers && \
     cp /tmp/upscalers/4xLSDIR.pth /4xLSDIR.pth && \
