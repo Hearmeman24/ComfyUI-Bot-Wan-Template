@@ -49,11 +49,11 @@ RUN cd /ComfyUI && \
 FROM base AS final
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/clip_vision
+RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/clip_vision /models/loras
 
 # Download models with aria2
-RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_i2v_480p_14B_bf16.safetensors \
-    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors
+RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_i2v_720p_14B_fp16.safetensors \
+    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors
 RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_14B_bf16.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors
 RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_vace_1.3B_preview_fp16.safetensors \
@@ -78,6 +78,9 @@ RUN aria2c -x16 -s16 -d /models/vae -o wan_2.1_vae.safetensors \
 # CLIP vision model
 RUN aria2c -x16 -s16 -d /models/clip_vision -o clip_vision_h.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+
+RUN aria2c -x16 -s16 -d /models/loras -o Wan21_CausVid_14B_T2V_lora_rank32.safetensors \
+    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32.safetensors
 
 # Upscalers
 RUN git clone https://github.com/Hearmeman24/upscalers.git /tmp/upscalers && \

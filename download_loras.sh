@@ -95,6 +95,10 @@ file_list=(
   "wan-t2v-anal-reverse-cowgirl-e54.safetensors"
   "spanking_for_wan_v1_e128.safetensors"
   "tongue kiss.safetensors"
+  "wan_cumshot_i2v.safetensors"
+  "flaccid_penis_epoch_100.safetensors"
+  "T2V-stroking_it-14B.safetensors"
+  "fingering_i2v_e248.safetensors"
 )
 
 # Process each file
