@@ -53,6 +53,6 @@ download_file "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors"
 download_file "BoobPhysics_WAN_v7.safetensors"
 download_file "T2V - Dildo Masturbation - 14B.safetensors"
 download_file "sh4rpn3ss_v2_e56.safetensors"
-
+download_file "SU_Twrk_EP55.safetensors"
 
 echo "All LoRA files downloaded successfully"

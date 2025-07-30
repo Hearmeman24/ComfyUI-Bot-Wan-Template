@@ -55,7 +55,7 @@ RUN cd /ComfyUI && \
 FROM base AS final
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/clip_vision
+RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/clip_vision /models/loras
 
 # Split diffusion model downloads to avoid 50GB+ layers
 RUN wget -P /models/diffusion_models https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors
@@ -74,6 +74,8 @@ RUN wget -P /models/vae https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repacka
 
 # Clip vision
 RUN wget -P /models/clip_vision https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+
+RUN wget -P /models/loras https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32_v2.safetensors
 
 
 RUN pip install opencv-python
@@ -128,8 +130,10 @@ RUN pip install --no-cache-dir discord.py==2.5.2 \
 
 RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film/
 
-RUN wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film/film_net_fp32.pt \
-    https://d1s3da0dcaf6kx.cloudfront.net/film_net_fp32.pt
+RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/
+
+RUN wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/rife49.pth \
+    https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth
 
 # Entrypointtt
 COPY src/start_script.sh /start_script.sh
