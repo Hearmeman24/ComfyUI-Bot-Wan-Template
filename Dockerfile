@@ -102,6 +102,7 @@ RUN for repo in \
     https://github.com/rgthree/rgthree-comfy.git \
     https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
     https://github.com/cubiq/ComfyUI_essentials.git \
+    https://github.com/g0kuvonlange/ComfyUI-Load-From-URL \
     https://github.com/kijai/ComfyUI-WanVideoWrapper.git \
     https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git \
     https://github.com/chrisgoringe/cg-use-everywhere.git \
