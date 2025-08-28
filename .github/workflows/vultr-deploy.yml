@@ -10,7 +10,7 @@ jobs:
   build-and-push:
     uses: hearmeman24/hearmeman-vultr-build/.github/workflows/vultr-build.yml@main
     with:
-      harbor_project_name: ${{ vars.HARBOR_PROJECT_NAME || secrets.HARBOR_PROJECT_NAME }}
+      harbor_project_name: ${{ vars.HARBOR_PROJECT_NAME }}
       vultr_plan: "voc-g-8c-32gb-160s-amd"
       vultr_region: "fra"
     secrets:
