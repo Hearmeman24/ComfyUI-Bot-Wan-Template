@@ -50,7 +50,7 @@ jobs:
       - name: Install Vultr CLI
         run: |
           LATEST_VERSION=$(curl -s https://api.github.com/repos/vultr/vultr-cli/releases/latest | jq -r '.tag_name')  # e.g. v3.6.0
-          OS=$(uname -s | tr '[:upper:]' '[:lower:]')   # linux/darwin
+          OS=$(uname -s)   # Linux/Darwin (keep original case)
           ARCH=$(uname -m)
           case $ARCH in
             x86_64) ARCH=amd64 ;;
@@ -58,7 +58,7 @@ jobs:
           esac
           
           # Fix the OS naming convention for vultr-cli downloads
-          if [ "$OS" = "darwin" ]; then
+          if [ "$OS" = "Darwin" ]; then
             OS="macOs"
           fi
           
@@ -295,7 +295,7 @@ jobs:
         run: |
           if [ -n "${{ steps.create_instance.outputs.instance_id }}" ]; then
             echo "Deleting instance ${{ steps.create_instance.outputs.instance_id }}"
-            vultr-cli instance delete ${{ steps.create_instance.outputs.instance_id }} --force || true
+            vultr-cli instance delete ${{ steps.create_instance.outputs.instance_id }} || true
           fi
           if [ -n "${{ steps.add_ssh.outputs.ssh_key_id }}" ]; then
             echo "Deleting SSH key ${{ steps.add_ssh.outputs.ssh_key_id }}"
