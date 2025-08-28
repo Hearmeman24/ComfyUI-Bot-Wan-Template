@@ -278,7 +278,12 @@ jobs:
 
           # Wait for cloud-init completion marker
           for i in $(seq 1 60); do
-            if ssh -i id_ed25519 -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@"$IP_ADDRESS" "test -f /tmp/setup-complete" 2>/dev/null; then
+            if ssh -i id_ed25519 \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=5 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              root@"$IP_ADDRESS" "test -f /tmp/setup-complete" 2>/dev/null; then
               echo "Startup script completed!"
               exit 0
             fi
@@ -297,22 +302,93 @@ jobs:
           #!/usr/bin/env bash
           set -euxo pipefail
 
+          echo "Starting build process at $(date)"
+          
           git clone https://github.com/${{ github.repository }}.git /tmp/repo
           cd /tmp/repo
           git checkout ${{ steps.extract_tag.outputs.tag }}
 
           echo "$REGISTRY_PASSWORD" | docker login registry.hearmemanai.xyz -u "$REGISTRY_USERNAME" --password-stdin
 
+          echo "Starting Docker build at $(date)"
           docker build \
             --build-arg CIVITAI_TOKEN="$CIVITAI_TOKEN" \
             -t registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }} .
 
-          docker push registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }}
+          echo "Starting Docker push at $(date) - this will take approximately 15-20 minutes for 150GB image"
+          
+          # Use Docker push with progress output and timeout handling
+          timeout 3600 docker push registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }} || {
+            echo "Push timed out after 1 hour, attempting retry..."
+            docker push registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }}
+          }
+          
+          echo "Build and push completed successfully at $(date)"
           EOF
 
           scp -i id_ed25519 -o StrictHostKeyChecking=no build-script.sh root@"$IP":/tmp/
-          ssh -i id_ed25519 -o StrictHostKeyChecking=no root@"$IP" \
-            "REGISTRY_USERNAME='${{ secrets.REGISTRY_USERNAME }}' REGISTRY_PASSWORD='${{ secrets.REGISTRY_PASSWORD }}' CIVITAI_TOKEN='${{ secrets.CIVITAI_TOKEN }}' HARBOR_PROJECT_NAME='${{ env.HARBOR_PROJECT_NAME }}' bash /tmp/build-script.sh"
+          
+          # Start the build process in background with nohup
+          ssh -i id_ed25519 \
+            -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=60 \
+            -o ServerAliveCountMax=10 \
+            -o TCPKeepAlive=yes \
+            -o ConnectTimeout=30 \
+            root@"$IP" \
+            "REGISTRY_USERNAME='${{ secrets.REGISTRY_USERNAME }}' REGISTRY_PASSWORD='${{ secrets.REGISTRY_PASSWORD }}' CIVITAI_TOKEN='${{ secrets.CIVITAI_TOKEN }}' HARBOR_PROJECT_NAME='${{ env.HARBOR_PROJECT_NAME }}' nohup bash /tmp/build-script.sh > /tmp/build.log 2>&1 & echo \$! > /tmp/build.pid && echo 'Build started in background'"
+          
+          # Monitor the build process
+          echo "Monitoring build progress (will check every 2 minutes)..."
+          while true; do
+            # Check if process is still running
+            if ssh -i id_ed25519 \
+              -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o ConnectTimeout=10 \
+              root@"$IP" \
+              "kill -0 \$(cat /tmp/build.pid 2>/dev/null) 2>/dev/null"; then
+              
+              echo "Build still in progress at $(date)..."
+              # Show last few lines of log
+              ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "tail -5 /tmp/build.log 2>/dev/null || echo 'Log not ready yet'"
+              
+              sleep 120  # Wait 2 minutes before next check
+            else
+              echo "Build process finished, checking results..."
+              
+              # Get final log output
+              ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "tail -20 /tmp/build.log"
+              
+              # Check exit code
+              if ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "grep 'Build and push completed successfully' /tmp/build.log > /dev/null"; then
+                echo "✅ Build and push completed successfully!"
+                break
+              else
+                echo "❌ Build failed or incomplete"
+                exit 1
+              fi
+            fi
+          done
 
       - name: Cleanup - Delete Vultr instance and SSH key
         if: always()
