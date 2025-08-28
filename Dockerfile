@@ -30,10 +30,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 # ------------------------------------------------------------
 # PyTorch (CUDA 12.8) & core tooling (no pip cache mounts)
 # ------------------------------------------------------------
-# 2) Install PyTorch (CUDA 12.8) & freeze torch versions to constraints file
+# 2) Install PyTorch 2.7.0 stable (CUDA 12.8) & freeze torch versions to constraints file
 RUN pip install --upgrade pip && \
-    pip install --pre torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/nightly/cu128 && \
+    pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 \
+        --index-url https://download.pytorch.org/whl/cu128 && \
     # Save exact installed torch versions
     pip freeze | grep -E "^(torch|torchvision|torchaudio)" > /tmp/torch-constraint.txt && \
     # Install core tooling
@@ -89,16 +89,15 @@ COPY download_loras.sh /tmp/
 RUN chmod +x /tmp/download_loras.sh && /tmp/download_loras.sh
 
 
-RUN echo "torch==2.8.0.dev20250511+cu128" > /torch-constraint.txt && \
-    echo "torchaudio==2.6.0.dev20250511+cu128" >> /torch-constraint.txt && \
+RUN echo "torch==2.7.0+cu128" > /torch-constraint.txt && \
+    echo "torchaudio==2.7.0+cu128" >> /torch-constraint.txt && \
     echo "torchsde==0.2.6" >> /torch-constraint.txt && \
-    echo "torchvision==0.22.0.dev20250511+cu128" >> /torch-constraint.txt
+    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt
 
 # Clone and install all your custom nodes
 RUN for repo in \
     https://github.com/kijai/ComfyUI-KJNodes.git \
     https://github.com/Comfy-Org/ComfyUI-Manager.git \
-    https://github.com/nonnonstop/comfyui-faster-loading.git \
     https://github.com/rgthree/rgthree-comfy.git \
     https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
     https://github.com/cubiq/ComfyUI_essentials.git \
