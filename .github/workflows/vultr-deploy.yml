@@ -49,26 +49,50 @@ jobs:
 
       - name: Install Vultr CLI
         run: |
-          LATEST_VERSION=$(curl -s https://api.github.com/repos/vultr/vultr-cli/releases/latest | jq -r '.tag_name')  # e.g. v3.6.0
-          OS=$(uname -s)   # Linux/Darwin (keep original case)
-          ARCH=$(uname -m)
-          case $ARCH in
-            x86_64) ARCH=amd64 ;;
-            aarch64) ARCH=arm64 ;;
-          esac
+          # Use a proven working version instead of dynamic URL construction
+          VULTR_CLI_VERSION="v3.6.0"
+          echo "Installing vultr-cli version $VULTR_CLI_VERSION"
           
-          # Fix the OS naming convention for vultr-cli downloads
-          if [ "$OS" = "Darwin" ]; then
-            OS="macOs"
+          # Try the most common naming conventions for vultr-cli releases
+          DOWNLOAD_URLS=(
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_linux_amd64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_Linux_amd64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_linux_x86_64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_Linux_x86_64.tar.gz"
+          )
+          
+          # Try each URL until one works
+          for URL in "${DOWNLOAD_URLS[@]}"; do
+            echo "Trying: $URL"
+            if curl -L --fail "$URL" -o /tmp/vultr-cli.tgz; then
+              echo "Successfully downloaded from: $URL"
+              break
+            else
+              echo "Failed to download from: $URL"
+            fi
+          done
+          
+          # Verify we got a file
+          if [ ! -f /tmp/vultr-cli.tgz ]; then
+            echo "ERROR: Failed to download vultr-cli from any URL"
+            exit 1
           fi
           
-          URL="https://github.com/vultr/vultr-cli/releases/download/${LATEST_VERSION}/vultr-cli_${LATEST_VERSION}_${OS}_${ARCH}.tar.gz"
-          echo "Downloading $URL"
-          curl -L "$URL" -o /tmp/vultr-cli.tgz
           tar -xzf /tmp/vultr-cli.tgz -C /tmp
-          BIN=$(find /tmp -maxdepth 1 -type f -name 'vultr-cli*' | head -n1)
+          BIN=$(find /tmp -maxdepth 1 -type f -name 'vultr-cli*' -executable | head -n1)
+          
+          if [ -z "$BIN" ]; then
+            echo "ERROR: No executable vultr-cli binary found after extraction"
+            ls -la /tmp/
+            exit 1
+          fi
+          
           sudo mv "$BIN" /usr/local/bin/vultr-cli
           sudo chmod +x /usr/local/bin/vultr-cli
+          
+          # Verify the binary works
+          echo "Verifying vultr-cli installation..."
+          file /usr/local/bin/vultr-cli
           vultr-cli version
 
       - name: Generate ephemeral SSH keypair
