@@ -14,7 +14,7 @@ jobs:
       vultr_plan: "voc-g-8c-32gb-160s-amd"
       vultr_region: "fra"
     secrets:
-      github_pat: ${{ secrets.GITHUB_PAT }}
+      pat: ${{ secrets.PAT }}
       vultr_api_key: ${{ secrets.VULTR_API_KEY }}
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
