@@ -15,7 +15,13 @@ if [ -d "ComfyUI-Bot-Wan-Template" ]; then
 fi
 
 echo "📥 Cloning branch '$BRANCH' of ComfyUI-Bot-Wan-Template…"
-git clone --branch "$BRANCH" https://github.com/Hearmeman24/ComfyUI-Bot-Wan-Template.git
+if [ -n "${GITHUB_PAT:-}" ]; then
+  echo "🔑 Using GitHub PAT for authentication..."
+  git clone --branch "$BRANCH" https://${GITHUB_PAT}@github.com/Hearmeman24/ComfyUI-Bot-Wan-Template.git
+else
+  echo "🌐 Attempting public clone..."
+  git clone --branch "$BRANCH" https://github.com/Hearmeman24/ComfyUI-Bot-Wan-Template.git
+fi
 
 echo "📂 Moving start.sh into place…"
 mv ComfyUI-Bot-Wan-Template/src/start.sh /

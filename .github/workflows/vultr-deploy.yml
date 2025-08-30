@@ -6,9 +6,13 @@ on:
     tags:
       - 'v*'  # e.g., v1.0.0
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   build-and-push:
-    uses: Hearmeman24/hearmeman-vultr-build/.github/workflows/vultr-build.yml@main
+    uses: Hearmeman24/hearmeman-vultr-build/.github/workflows/vultr-build.yml@03aaf27
     with:
       harbor_project_name: ${{ vars.HARBOR_PROJECT_NAME }}
       vultr_plan: "voc-g-8c-32gb-160s-amd"

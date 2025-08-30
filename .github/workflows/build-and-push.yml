@@ -1,0 +1,526 @@
+name: Build and Push ComfyUI Wan Template
+
+on:
+  push:
+    tags:
+      - 'v*'  # e.g., v1.0.0
+  workflow_dispatch:
+    inputs:
+      harbor_project_name:
+        description: 'Harbor project name for Docker registry'
+        required: true
+        default: 'comfyui-wan-template'
+        type: string
+      vultr_plan:
+        description: 'Vultr instance plan'
+        required: false
+        default: "voc-g-8c-32gb-160s-amd"
+        type: string
+      vultr_region:
+        description: 'Vultr region'
+        required: false
+        default: "fra"
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    env:
+      VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
+      HARBOR_PROJECT_NAME: ${{ github.event.inputs.harbor_project_name || 'comfyui-wan-template' }}
+      DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1371182229534801961/XY1CBwSPH6pqev2geYRrbZHogIChLsA6oThbPUmHnkwjkDuRZPfA16G0jgWlbNmfGpIc"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          echo "Validating required configuration..."
+          PROJECT_NAME="${{ env.HARBOR_PROJECT_NAME }}"
+          
+          if [ -z "$PROJECT_NAME" ]; then
+            echo "ERROR: harbor_project_name is not set"
+            echo "Please set this to your Harbor project/repository name (e.g., 'comfyui-wan-template')"
+            exit 1
+          fi
+          
+          # Validate lowercase format for Docker compatibility
+          if ! echo "$PROJECT_NAME" | grep -E '^[a-z0-9][a-z0-9._-]*$' > /dev/null; then
+            echo "ERROR: harbor_project_name must be lowercase and contain only letters, numbers, dots, underscores, and hyphens"
+            echo "Current value: '$PROJECT_NAME'"
+            exit 1
+          fi
+          
+          echo "✓ HARBOR_PROJECT_NAME: $PROJECT_NAME"
+          echo "✓ Docker image will be: registry.hearmemanai.xyz/$PROJECT_NAME/$PROJECT_NAME:TAG"
+
+      - name: Extract tag
+        id: extract_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Discord notification - Build started
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "embeds": [{
+                "title": "🚀 Build Started",
+                "description": "Docker build process has started for **${{ env.HARBOR_PROJECT_NAME }}**",
+                "color": 3447003,
+                "fields": [
+                  {
+                    "name": "Repository", 
+                    "value": "${{ github.repository }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Tag", 
+                    "value": "${{ steps.extract_tag.outputs.tag }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Vultr Region", 
+                    "value": "${{ github.event.inputs.vultr_region || 'fra' }}", 
+                    "inline": true
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }' \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq curl tar openssh-client
+
+      - name: Install Vultr CLI
+        run: |
+          # Use a proven working version instead of dynamic URL construction
+          VULTR_CLI_VERSION="v3.6.0"
+          echo "Installing vultr-cli version $VULTR_CLI_VERSION"
+          
+          # Try the most common naming conventions for vultr-cli releases
+          DOWNLOAD_URLS=(
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_linux_amd64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_Linux_amd64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_linux_x86_64.tar.gz"
+            "https://github.com/vultr/vultr-cli/releases/download/${VULTR_CLI_VERSION}/vultr-cli_${VULTR_CLI_VERSION}_Linux_x86_64.tar.gz"
+          )
+          
+          # Try each URL until one works
+          for URL in "${DOWNLOAD_URLS[@]}"; do
+            echo "Trying: $URL"
+            if curl -L --fail "$URL" -o /tmp/vultr-cli.tgz; then
+              echo "Successfully downloaded from: $URL"
+              break
+            else
+              echo "Failed to download from: $URL"
+            fi
+          done
+          
+          # Verify we got a file
+          if [ ! -f /tmp/vultr-cli.tgz ]; then
+            echo "ERROR: Failed to download vultr-cli from any URL"
+            exit 1
+          fi
+          
+          tar -xzf /tmp/vultr-cli.tgz -C /tmp
+          BIN=$(find /tmp -maxdepth 1 -type f -name 'vultr-cli*' -executable | head -n1)
+          
+          if [ -z "$BIN" ]; then
+            echo "ERROR: No executable vultr-cli binary found after extraction"
+            ls -la /tmp/
+            exit 1
+          fi
+          
+          sudo mv "$BIN" /usr/local/bin/vultr-cli
+          sudo chmod +x /usr/local/bin/vultr-cli
+          
+          # Verify the binary works
+          echo "Verifying vultr-cli installation..."
+          file /usr/local/bin/vultr-cli
+          vultr-cli version
+
+      - name: Generate ephemeral SSH keypair
+        id: ssh_key
+        run: |
+          ssh-keygen -t ed25519 -N "" -f id_ed25519
+          chmod 600 id_ed25519
+          echo "ssh_pub=$(cat id_ed25519.pub)" >> $GITHUB_OUTPUT
+
+      - name: Register SSH public key in Vultr
+        id: add_ssh
+        run: |
+          KEY_NAME="gha-${{ steps.extract_tag.outputs.tag }}-$(date +%s)"
+          echo "Creating SSH key with name: $KEY_NAME"
+          
+          SSH_KEY_JSON=$(vultr-cli ssh-key create --name "$KEY_NAME" --key "${{ steps.ssh_key.outputs.ssh_pub }}" -o json)
+          echo "SSH key creation response:"
+          echo "$SSH_KEY_JSON"
+          
+          # Try multiple possible response formats for SSH key ID
+          KEY_ID=$(echo "$SSH_KEY_JSON" | jq -r '.ssh_key.id // .id // .ssh_keys[0].id // empty')
+          
+          if [ -z "$KEY_ID" ] || [ "$KEY_ID" = "null" ]; then
+            echo "ERROR: Failed to create SSH key or extract key ID"
+            echo "Full response: $SSH_KEY_JSON"
+            exit 1
+          fi
+          
+          echo "Created SSH key with ID: $KEY_ID"
+          echo "ssh_key_id=$KEY_ID" >> $GITHUB_OUTPUT
+
+      - name: Create cloud-init user-data
+        run: |
+          cat > startup-userdata.sh << 'EOF'
+          #!/bin/bash
+          set -euxo pipefail
+          apt-get update && apt-get upgrade -y
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
+          apt-get install -y git
+          touch /tmp/setup-complete
+          EOF
+
+      - name: Create Vultr instance (Ubuntu 22.04, dynamic OS lookup)
+        id: create_instance
+        run: |
+          # Discover Ubuntu 22.04 x64 OS ID dynamically
+          echo "Fetching OS catalog..."
+          vultr-cli os list -o json > /tmp/os_catalog.json
+          echo "OS catalog response:"
+          cat /tmp/os_catalog.json | jq .
+          
+          OS_ID=$(cat /tmp/os_catalog.json \
+            | jq -r '.os[] | select((.name | test("Ubuntu 22\\.04"; "i")) and (.arch == "x64")) | .id' \
+            | head -n1)
+
+          if [ -z "$OS_ID" ]; then
+            echo "Could not find Ubuntu 22.04 x64 in OS catalog. Available Ubuntu options:"
+            cat /tmp/os_catalog.json | jq -r '.os[] | select(.name | test("Ubuntu"; "i")) | "\(.id): \(.name) (\(.arch))"'
+            exit 1
+          fi
+          echo "Using OS_ID=$OS_ID (Ubuntu 22.04 x64)"
+
+          # Ensure plan exists (adjust if needed)
+          PLAN_ID="${{ github.event.inputs.vultr_plan || 'voc-g-8c-32gb-160s-amd' }}"
+          if ! vultr-cli plans list -o json | jq -e --arg p "$PLAN_ID" '.plans[] | select(.id == $p)' > /dev/null; then
+            echo "Plan $PLAN_ID not found. Available plans:"
+            vultr-cli plans list -o json | jq -r '.plans[] | "\(.id): \(.vcpu_count)vCPU, \(.ram)MB RAM, \(.disk)GB disk - $\(.monthly_cost)/month"' | head -10
+            exit 1
+          fi
+
+          USERDATA=$(< ./startup-userdata.sh)
+          SSH_KEY_ID="${{ steps.add_ssh.outputs.ssh_key_id }}"
+          
+          echo "Instance creation parameters:"
+          echo "  Region: ${{ github.event.inputs.vultr_region || 'fra' }}"
+          echo "  Plan: $PLAN_ID"
+          echo "  OS: $OS_ID"
+          echo "  SSH Key ID: $SSH_KEY_ID"
+          echo "  Label: build-${{ steps.extract_tag.outputs.tag }}"
+          
+          # Validate SSH key ID format (should be UUID, case-insensitive)
+          if ! echo "$SSH_KEY_ID" | grep -iE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' > /dev/null; then
+            echo "ERROR: SSH key ID '$SSH_KEY_ID' is not a valid UUID format"
+            echo "Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            exit 1
+          fi
+
+          INSTANCE_JSON=$(vultr-cli instance create \
+            --region "${{ github.event.inputs.vultr_region || 'fra' }}" \
+            --plan "$PLAN_ID" \
+            --os "$OS_ID" \
+            --ssh-keys "$SSH_KEY_ID" \
+            --label "build-${{ steps.extract_tag.outputs.tag }}" \
+            --userdata "$USERDATA" \
+            -o json)
+
+          echo "Instance creation response:"
+          echo "$INSTANCE_JSON"
+          
+          # Try multiple possible response formats for instance ID
+          INSTANCE_ID=$(echo "$INSTANCE_JSON" | jq -r '.instance.id // .id // empty')
+          
+          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "null" ]; then
+            echo "ERROR: Failed to extract instance ID from response"
+            echo "Full response: $INSTANCE_JSON"
+            exit 1
+          fi
+          
+          # Validate instance ID format (should be UUID)
+          if ! echo "$INSTANCE_ID" | grep -iE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' > /dev/null; then
+            echo "ERROR: Instance ID '$INSTANCE_ID' is not a valid UUID format"
+            echo "Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            exit 1
+          fi
+          
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Created instance: $INSTANCE_ID"
+
+      - name: Wait for instance to be ready & fetch IP
+        id: wait_instance
+        timeout-minutes: 15
+        run: |
+          INSTANCE_ID=${{ steps.create_instance.outputs.instance_id }}
+          echo "Waiting for instance ID: $INSTANCE_ID"
+          
+          # Validate instance ID format before using it
+          if ! echo "$INSTANCE_ID" | grep -iE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' > /dev/null; then
+            echo "ERROR: Instance ID '$INSTANCE_ID' is not a valid UUID format"
+            exit 1
+          fi
+
+          # Wait until instance is active
+          RETRY_COUNT=0
+          MAX_RETRIES=90  # 15 minutes with 10 second intervals
+          until [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; do
+            echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Checking instance status..."
+            
+            INSTANCE_STATUS_JSON=$(vultr-cli instance get "$INSTANCE_ID" -o json 2>&1)
+            INSTANCE_GET_EXIT_CODE=$?
+            
+            if [ $INSTANCE_GET_EXIT_CODE -ne 0 ]; then
+              echo "Error getting instance (exit code $INSTANCE_GET_EXIT_CODE):"
+              echo "$INSTANCE_STATUS_JSON"
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              sleep 10
+              continue
+            fi
+            
+            echo "Instance status response:"
+            echo "$INSTANCE_STATUS_JSON"
+            
+            # Try multiple possible response formats for status
+            STATUS=$(echo "$INSTANCE_STATUS_JSON" | jq -r '.instance.status // .status // empty')
+            echo "Current status: $STATUS"
+            
+            if [ "$STATUS" = "active" ]; then
+              echo "Instance is now active!"
+              break
+            fi
+            
+            echo "Instance not yet active, waiting..."
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            sleep 10
+          done
+
+          if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
+            echo "ERROR: Instance did not become active within timeout period"
+            exit 1
+          fi
+
+          # Get IP address with the same response format handling
+          IP_ADDRESS=$(echo "$INSTANCE_STATUS_JSON" | jq -r '.instance.main_ip // .main_ip // empty')
+          
+          if [ -z "$IP_ADDRESS" ] || [ "$IP_ADDRESS" = "null" ]; then
+            echo "ERROR: Failed to extract IP address from instance"
+            echo "Full response: $INSTANCE_STATUS_JSON"
+            exit 1
+          fi
+          
+          echo "ip_address=$IP_ADDRESS" >> $GITHUB_OUTPUT
+          echo "Instance IP: $IP_ADDRESS"
+
+          # Wait for cloud-init completion marker
+          for i in $(seq 1 60); do
+            if ssh -i id_ed25519 \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=5 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              root@"$IP_ADDRESS" "test -f /tmp/setup-complete" 2>/dev/null; then
+              echo "Startup script completed!"
+              exit 0
+            fi
+            echo "[$i/60] setup not complete yet..."
+            sleep 10
+          done
+
+          echo "Setup did not complete in time" >&2
+          exit 1
+
+      - name: Build and push Docker image on the instance
+        run: |
+          IP=${{ steps.wait_instance.outputs.ip_address }}
+
+          cat > build-script.sh << 'EOF'
+          #!/usr/bin/env bash
+          set -euxo pipefail
+
+          echo "Starting build process at $(date)"
+          
+          git clone https://$PAT@github.com/${{ github.repository }}.git /tmp/repo
+          cd /tmp/repo
+          git checkout ${{ steps.extract_tag.outputs.tag }}
+
+          echo "$REGISTRY_PASSWORD" | docker login registry.hearmemanai.xyz -u "$REGISTRY_USERNAME" --password-stdin
+
+          echo "Starting Docker build at $(date)"
+          docker build \
+            --build-arg CIVITAI_TOKEN="$CIVITAI_TOKEN" \
+            -t registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }} \
+            -f ./Dockerfile \
+            .
+
+          echo "Starting Docker push at $(date) - this may take a while for large images"
+          
+          # Use Docker push with progress output and timeout handling
+          timeout 3600 docker push registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }} || {
+            echo "Push timed out after 1 hour, attempting retry..."
+            docker push registry.hearmemanai.xyz/"$HARBOR_PROJECT_NAME"/"$HARBOR_PROJECT_NAME":${{ steps.extract_tag.outputs.tag }}
+          }
+          
+          echo "Build and push completed successfully at $(date)"
+          EOF
+
+          scp -i id_ed25519 -o StrictHostKeyChecking=no build-script.sh root@"$IP":/tmp/
+          
+          # Start the build process in background with nohup
+          ssh -i id_ed25519 \
+            -o StrictHostKeyChecking=no \
+            -o ServerAliveInterval=60 \
+            -o ServerAliveCountMax=10 \
+            -o TCPKeepAlive=yes \
+            -o ConnectTimeout=30 \
+            root@"$IP" \
+            "PAT='${{ secrets.PAT }}' REGISTRY_USERNAME='${{ secrets.REGISTRY_USERNAME }}' REGISTRY_PASSWORD='${{ secrets.REGISTRY_PASSWORD }}' CIVITAI_TOKEN='${{ secrets.CIVITAI_TOKEN }}' HARBOR_PROJECT_NAME='${{ env.HARBOR_PROJECT_NAME }}' nohup bash /tmp/build-script.sh > /tmp/build.log 2>&1 & echo \$! > /tmp/build.pid && echo 'Build started in background'"
+          
+          # Monitor the build process
+          echo "Monitoring build progress (will check every 2 minutes)..."
+          while true; do
+            # Check if process is still running
+            if ssh -i id_ed25519 \
+              -o StrictHostKeyChecking=no \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -o ConnectTimeout=10 \
+              root@"$IP" \
+              "kill -0 \$(cat /tmp/build.pid 2>/dev/null) 2>/dev/null"; then
+              
+              echo "Build still in progress at $(date)..."
+              # Show last few lines of log
+              ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "tail -5 /tmp/build.log 2>/dev/null || echo 'Log not ready yet'"
+              
+              sleep 120  # Wait 2 minutes before next check
+            else
+              echo "Build process finished, checking results..."
+              
+              # Get final log output
+              ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "tail -20 /tmp/build.log"
+              
+              # Check exit code
+              if ssh -i id_ed25519 \
+                -o StrictHostKeyChecking=no \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=3 \
+                -o ConnectTimeout=10 \
+                root@"$IP" \
+                "grep 'Build and push completed successfully' /tmp/build.log > /dev/null"; then
+                echo "✅ Build and push completed successfully!"
+                break
+              else
+                echo "❌ Build failed or incomplete"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Send Discord notification - Build successful
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "embeds": [{
+                "title": "✅ Build Completed Successfully",
+                "description": "Docker image for **${{ env.HARBOR_PROJECT_NAME }}** has been built and pushed successfully!",
+                "color": 65280,
+                "fields": [
+                  {
+                    "name": "Repository", 
+                    "value": "${{ github.repository }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Tag", 
+                    "value": "${{ steps.extract_tag.outputs.tag }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Registry Image", 
+                    "value": "registry.hearmemanai.xyz/${{ env.HARBOR_PROJECT_NAME }}/${{ env.HARBOR_PROJECT_NAME }}:${{ steps.extract_tag.outputs.tag }}", 
+                    "inline": false
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }' \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Send Discord notification - Build failed
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d '{
+              "embeds": [{
+                "title": "❌ Build Failed",
+                "description": "Docker build process failed for **${{ env.HARBOR_PROJECT_NAME }}**",
+                "color": 16711680,
+                "fields": [
+                  {
+                    "name": "Repository", 
+                    "value": "${{ github.repository }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Tag", 
+                    "value": "${{ steps.extract_tag.outputs.tag }}", 
+                    "inline": true
+                  },
+                  {
+                    "name": "Workflow Run", 
+                    "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", 
+                    "inline": false
+                  }
+                ],
+                "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'"
+              }]
+            }' \
+            "$DISCORD_WEBHOOK_URL"
+
+      - name: Cleanup - Delete Vultr instance and SSH key
+        if: always()
+        run: |
+          if [ -n "${{ steps.create_instance.outputs.instance_id }}" ]; then
+            echo "Deleting instance ${{ steps.create_instance.outputs.instance_id }}"
+            vultr-cli instance delete ${{ steps.create_instance.outputs.instance_id }} || true
+          fi
+          if [ -n "${{ steps.add_ssh.outputs.ssh_key_id }}" ]; then
+            echo "Deleting SSH key ${{ steps.add_ssh.outputs.ssh_key_id }}"
+            vultr-cli ssh-key delete ${{ steps.add_ssh.outputs.ssh_key_id }} || true
+          fi

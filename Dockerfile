@@ -136,8 +136,10 @@ RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/
 RUN wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/rife49.pth \
     https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth
 
-# Entrypointtt
-COPY src/start_script.sh /start_script.sh
-RUN chmod +x /start_script.sh
+# Copy all source files at build time instead of runtime clone
+COPY src/ /app/src/
+RUN chmod +x /app/src/start.sh
+
+# Entrypoint
 EXPOSE 8888
-CMD ["/start_script.sh"]
+CMD ["/app/src/start.sh"]
