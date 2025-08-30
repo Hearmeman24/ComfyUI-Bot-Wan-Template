@@ -18,7 +18,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         python3.12 python3.12-venv python3.12-dev \
         python3-pip \
         curl ffmpeg ninja-build git git-lfs wget vim \
-        libgl1 libglib2.0-0 build-essential gcc && \
+        libgl1 libglib2.0-0 build-essential gcc \
+        libopenblas-dev liblapack-dev && \
     ln -sf /usr/bin/python3.12 /usr/bin/python && \
     ln -sf /usr/bin/pip3 /usr/bin/pip && \
     python3.12 -m venv /opt/venv && \

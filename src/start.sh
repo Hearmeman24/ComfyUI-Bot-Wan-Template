@@ -7,6 +7,12 @@ export LD_PRELOAD="${TCMALLOC}"
 set -eo pipefail
 set +u
 
+# Check and install OpenBLAS if missing (runtime fallback)
+if ! ldconfig -p | grep -q libopenblas; then
+    echo "🔧 Installing missing OpenBLAS libraries..."
+    apt-get update && apt-get install -y libopenblas-dev liblapack-dev
+fi
+
 echo "🔧 Installing KJNodes packages..."
 pip install -r /ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt &
 KJ_PID=$!
