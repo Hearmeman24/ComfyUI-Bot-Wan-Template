@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VULTR_API_KEY: ${{ secrets.VULTR_API_KEY }}
-      HARBOR_PROJECT_NAME: ${{ github.event.inputs.harbor_project_name || 'comfyui-wan-template' }}
+      HARBOR_PROJECT_NAME: ${{ vars.HARBOR_PROJECT_NAME || github.event.inputs.harbor_project_name || 'comfyui-wan-template' }}
       DISCORD_WEBHOOK_URL: "https://discord.com/api/webhooks/1371182229534801961/XY1CBwSPH6pqev2geYRrbZHogIChLsA6oThbPUmHnkwjkDuRZPfA16G0jgWlbNmfGpIc"
 
     steps:
