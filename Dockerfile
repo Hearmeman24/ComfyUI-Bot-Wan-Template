@@ -98,7 +98,8 @@ RUN chmod +x /tmp/download_loras.sh && /tmp/download_loras.sh
 RUN echo "torch==2.7.0+cu128" > /torch-constraint.txt && \
     echo "torchaudio==2.7.0+cu128" >> /torch-constraint.txt && \
     echo "torchsde==0.2.6" >> /torch-constraint.txt && \
-    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt
+    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt && \
+    echo "numpy<2.0.0,>=1.20.0" >> /torch-constraint.txt
 
 # Clone and install all your custom nodes
 RUN for repo in \
