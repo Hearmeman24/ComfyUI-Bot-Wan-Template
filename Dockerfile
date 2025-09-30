@@ -98,8 +98,7 @@ RUN chmod +x /tmp/download_loras.sh && /tmp/download_loras.sh
 RUN echo "torch==2.7.0+cu128" > /torch-constraint.txt && \
     echo "torchaudio==2.7.0+cu128" >> /torch-constraint.txt && \
     echo "torchsde==0.2.6" >> /torch-constraint.txt && \
-    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt && \
-    echo "numpy<2.0.0,>=1.20.0" >> /torch-constraint.txt
+    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt
 
 # Clone and install all your custom nodes
 RUN for repo in \
@@ -144,9 +143,7 @@ RUN wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/rife49.
     https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth
 
 # Copy all source files at build time instead of runtime clone
-COPY src/ /app/src/
-RUN chmod +x /app/src/start.sh
-
-# Entrypoint
+COPY src/start_script.sh /start_script.sh
+RUN chmod +x /start_script.sh
 EXPOSE 8888
-CMD ["/app/src/start.sh"]
+CMD ["/start_script.sh"]
