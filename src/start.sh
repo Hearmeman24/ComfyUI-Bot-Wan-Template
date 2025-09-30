@@ -120,9 +120,18 @@ if [ -f "$FLAG_FILE" ] || [ "$new_config" = "true" ]; then
   mkdir -p "$NETWORK_VOLUME/${RUNPOD_POD_ID}"
   nohup bash -c "python3 \"$NETWORK_VOLUME\"/ComfyUI/main.py --listen --use-sage-attention --extra-model-paths-config '/ComfyUI-Bot-Wan-Template/extra_model_paths.yaml' 2>&1 | tee \"$NETWORK_VOLUME\"/comfyui_\"$RUNPOD_POD_ID\"_nohup.log" &
 
+  # Wait for ComfyUI to start (max 3 minutes)
+  TIMEOUT=180  # 3 minutes in seconds
+  ELAPSED=0
   until curl --silent --fail "$URL" --output /dev/null; do
-      echo "🔄  Still waiting…"
+      if [ $ELAPSED -ge $TIMEOUT ]; then
+          echo "❌ Timeout: ComfyUI failed to start within 3 minutes"
+          report_status false "ComfyUI startup timeout after 3 minutes"
+          exit 1
+      fi
+      echo "🔄  Still waiting… (${ELAPSED}s/${TIMEOUT}s)"
       sleep 2
+      ELAPSED=$((ELAPSED + 2))
   done
 
   echo "ComfyUI is UP Starting worker"
