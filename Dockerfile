@@ -18,8 +18,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         aria2 \
         python3.12 python3.12-venv python3.12-dev \
         python3-pip \
-        curl ffmpeg ninja-build git git-lfs vim \
-        libgl1 libglib2.0-0 build-essential gcc && \
+        curl ffmpeg ninja-build git git-lfs wget vim \
+        libgl1 libglib2.0-0 build-essential gcc \
+        libopenblas-dev liblapack-dev && \
     ln -sf /usr/bin/python3.12 /usr/bin/python && \
     ln -sf /usr/bin/pip3 /usr/bin/pip && \
     python3.12 -m venv /opt/venv && \
@@ -30,9 +31,11 @@ ENV PATH="/opt/venv/bin:$PATH"
 # ------------------------------------------------------------
 # PyTorch (CUDA 12.8) & core tooling (no pip cache mounts)
 # ------------------------------------------------------------
+# Install PyTorch 2.7.0 stable (CUDA 12.8) & freeze torch versions to constraints file
 RUN pip install --upgrade pip && \
-    pip install --pre torch torchvision torchaudio \
-        --index-url https://download.pytorch.org/whl/nightly/cu128 && \
+    pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 \
+        --index-url https://download.pytorch.org/whl/cu128 && \
+    # Save exact installed torch versions
     pip freeze | grep -E "^(torch|torchvision|torchaudio)" > /tmp/torch-constraint.txt && \
     pip install packaging setuptools wheel pyyaml gdown triton runpod opencv-python
 
@@ -51,9 +54,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 RUN mkdir -p /models/diffusion_models /models/text_encoders /models/vae /models/clip_vision /models/loras
 
-# Download models with aria2
-RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_i2v_720p_14B_fp16.safetensors \
-    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_720p_14B_fp16.safetensors
+# Download models with aria2 (using 480p model from master)
+RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_i2v_480p_14B_bf16.safetensors \
+    https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_bf16.safetensors
 RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_t2v_14B_bf16.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_t2v_14B_bf16.safetensors
 RUN aria2c -x16 -s16 -d /models/diffusion_models -o wan2.1_vace_1.3B_preview_fp16.safetensors \
@@ -79,9 +82,7 @@ RUN aria2c -x16 -s16 -d /models/vae -o wan_2.1_vae.safetensors \
 RUN aria2c -x16 -s16 -d /models/clip_vision -o clip_vision_h.safetensors \
     https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
 
-RUN aria2c -x16 -s16 -d /models/loras -o Wan21_CausVid_14B_T2V_lora_rank32.safetensors \
-    https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32.safetensors
-
+# LoRA models - using aria2c for consistency
 RUN aria2c -x16 -s16 -d /models/loras -o Wan21_CausVid_14B_T2V_lora_rank32_v2.safetensors \
     https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Wan21_CausVid_14B_T2V_lora_rank32_v2.safetensors
 
@@ -94,19 +95,19 @@ RUN mkdir -p /models/loras
 COPY download_loras.sh /tmp/
 RUN chmod +x /tmp/download_loras.sh && /tmp/download_loras.sh
 
-RUN echo "torch==2.8.0.dev20250511+cu128" > /torch-constraint.txt && \
-    echo "torchaudio==2.6.0.dev20250511+cu128" >> /torch-constraint.txt && \
+RUN echo "torch==2.7.0+cu128" > /torch-constraint.txt && \
+    echo "torchaudio==2.7.0+cu128" >> /torch-constraint.txt && \
     echo "torchsde==0.2.6" >> /torch-constraint.txt && \
-    echo "torchvision==0.22.0.dev20250511+cu128" >> /torch-constraint.txt
+    echo "torchvision==0.22.0+cu128" >> /torch-constraint.txt
 
 # Clone and install all your custom nodes
 RUN for repo in \
     https://github.com/kijai/ComfyUI-KJNodes.git \
     https://github.com/Comfy-Org/ComfyUI-Manager.git \
-    https://github.com/nonnonstop/comfyui-faster-loading.git \
     https://github.com/rgthree/rgthree-comfy.git \
     https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
     https://github.com/cubiq/ComfyUI_essentials.git \
+    https://github.com/g0kuvonlange/ComfyUI-Load-From-URL \
     https://github.com/kijai/ComfyUI-WanVideoWrapper.git \
     https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git \
     https://github.com/chrisgoringe/cg-use-everywhere.git \
@@ -133,13 +134,18 @@ RUN pip install --no-cache-dir discord.py==2.5.2 \
                               websocket_client==1.8.0 \
                               "httpx[http2]"
 
-# Frame Interp checkpoint
-RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film/ && \
-    aria2c -x16 -s16 -d /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film -o film_net_fp32.pt \
-    https://d1s3da0dcaf6kx.cloudfront.net/film_net_fp32.pt
+# Frame Interpolation models - both FILM and RIFE
+RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/film/
+
+RUN mkdir -p /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/
+
+RUN wget -O /ComfyUI/custom_nodes/ComfyUI-Frame-Interpolation/ckpts/rife/rife49.pth \
+    https://github.com/styler00dollar/VSGAN-tensorrt-docker/releases/download/models/rife49.pth
+
+# Copy all source files at build time instead of runtime clone
+COPY src/ /app/src/
+RUN chmod +x /app/src/start.sh
 
 # Entrypoint
-COPY src/start_script.sh /start_script.sh
-RUN chmod +x /start_script.sh
 EXPOSE 8888
-CMD ["/start_script.sh"]
+CMD ["/app/src/start.sh"]

@@ -55,7 +55,7 @@ echo "Download directory: $(pwd)" | tee -a $LOG_FILE
 total_files=0
 successful_downloads=0
 
-# Download all LoRA files
+# Download all LoRA files - combined list from both branches
 file_list=(
   "wan-nsfw-e14-fixed.safetensors"
   "big_tits_epoch_50.safetensors"
@@ -67,6 +67,7 @@ file_list=(
   "wan_missionary_side.safetensors"
   "dicks_epoch_100.safetensors"
   "masturbation_cumshot_v1.1_e310.safetensors"
+  "masturbation_cumshot_wanI2V480p_v1.safetensors"
   "T2V - POV Handjob - 14b.safetensors"
   "instagram_girls.safetensors"
   "r0und4b0ut-wan-v1.0.safetensors"
@@ -86,11 +87,18 @@ file_list=(
   "Su_Bl_Ep02-Wan.safetensors"
   "wan_female_masturbation.safetensors"
   "Wan-Hip_Slammin_Assertive_Cowgirl.safetensors"
-  "analFromBehind_T2V_e100.safetensors"
+  "T2V - Skinny Petite Instagram Women - 14B.safetensors"
   "T2V-jiggle_tits-14b.safetensors"
+  "PPD_v-9.safetensors"
+  "DR34M15H_T2V_HD_v1.safetensors"
+  "T2V - Big Perky Breasts - 14b.safetensors"
+  "T2V - Bodyshots v2 - 14b.safetensors"
+  "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors"
+  "BoobPhysics_WAN_v7.safetensors"
+  "T2V - Dildo Masturbation - 14B.safetensors"
+  "sh4rpn3ss_v2_e56.safetensors"
+  "SU_Twrk_EP55.safetensors"
   "analFromBehind_T2V_e100.safetensors"
-  "T2V - POV Handjob - 14b.safetensors"
-  "masturbation_cumshot_v1.1_e310.safetensors"
   "jfj-deepthroat-v1.safetensors"
   "wan-t2v-anal-reverse-cowgirl-e54.safetensors"
   "spanking_for_wan_v1_e128.safetensors"
