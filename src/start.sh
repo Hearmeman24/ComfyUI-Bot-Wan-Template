@@ -14,12 +14,10 @@ if ! ldconfig -p | grep -q libopenblas; then
 fi
 
 echo "🔧 Installing KJNodes packages..."
-pip install -r /ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt --constraint /torch-constraint.txt &
-KJ_PID=$!
+pip install -r /ComfyUI/custom_nodes/ComfyUI-KJNodes/requirements.txt --constraint /torch-constraint.txt
 
 echo "🔧 Installing WanVideoWrapper packages..."
-pip install -r /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt --constraint /torch-constraint.txt &
-WAN_PID=$!
+pip install -r /ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt --constraint /torch-constraint.txt
 
 
 if [[ "${IS_DEV,,}" =~ ^(true|1|t|yes)$ ]]; then
@@ -90,29 +88,9 @@ sync_bot_repo() {
 
 if [ -f "$FLAG_FILE" ] || [ "$new_config" = "true" ]; then
   echo "FLAG FILE FOUND"
-  pip install --no-cache-dir -r $NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-WanVideoWrapper/requirements.txt --constraint /torch-constraint.txt
   mv "/4xLSDIR.pth" "$NETWORK_VOLUME/ComfyUI/models/upscale_models" || echo "Move operation failed, continuing..."
   rm -rf "$NETWORK_VOLUME/ComfyUI/custom_nodes/ComfyUI-Manager" || echo "Remove operation failed, continuing..."
   sync_bot_repo
-
-  wait $KJ_PID
-  KJ_STATUS=$?
-
-  wait $WAN_PID
-  WAN_STATUS=$?
-
-  # Check results
-  if [ $KJ_STATUS -ne 0 ]; then
-    echo "❌ KJNodes install failed."
-    exit 1
-  fi
-  echo "✅ KJNodes install complete" 
-
-  if [ $WAN_STATUS -ne 0 ]; then
-    echo "❌ WanVideoWrapper install failed."
-    exit 1
-  fi
-  echo "✅ WanVideoWrapper install complete" 
 
 
   echo "▶️  Starting ComfyUI"
