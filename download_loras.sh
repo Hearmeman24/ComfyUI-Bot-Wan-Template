@@ -1,58 +1,139 @@
 #!/bin/bash
-cd /models/loras || exit 1
+# Create log file
+LOG_FILE="/tmp/lora_download.log"
+echo "Starting LoRA downloads at $(date)" > "$LOG_FILE"
+
+# Create directory if it doesn't exist
+mkdir -p /models/loras
+cd /models/loras || {
+  echo "ERROR: Failed to cd to /models/loras directory" | tee -a "$LOG_FILE"
+  exit 1
+}
 
 # Function to download a file with proper URL encoding
 download_file() {
   filename="$1"
-  # URL encode the filename for the URL
-  encoded_url=$(echo "$filename" | sed -e "s/ /%20/g")
-  echo "Downloading $filename..."
-  wget -q -O "$filename" "https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url" || {
-    echo "Failed to download $filename"
+  # URL encode spaces
+  encoded_url="${filename// /%20}"
+  remote="https://d1s3da0dcaf6kx.cloudfront.net/$encoded_url"
+  output_dir="/models/loras"
+  full_path="$output_dir/$filename"
+
+  echo "Downloading $filename with aria2c..." | tee -a "$LOG_FILE"
+
+  # Ensure output directory exists
+  mkdir -p "$output_dir"
+
+  aria2c \
+    -x16 -s16 \
+    --retry-wait=5 \
+    --max-tries=3 \
+    --dir="$output_dir" \
+    --out="$filename" \
+    "$remote" 2>&1 | tee -a "$LOG_FILE"
+
+  if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+    echo "✅ Successfully downloaded $filename" | tee -a "$LOG_FILE"
+    filesize=$(stat -c%s "$full_path")
+    echo "   File size: $filesize bytes" | tee -a "$LOG_FILE"
+    if [ "$filesize" -lt 1000 ]; then
+      echo "   ⚠️ WARNING: File seems very small, might be corrupt or incomplete" | tee -a "$LOG_FILE"
+    fi
+    return 0
+  else
+    echo "❌ Failed to download $filename" | tee -a "$LOG_FILE"
+    echo "Checking if file exists on server..." | tee -a "$LOG_FILE"
+    curl -sI "$remote" | head -n 3 | tee -a "$LOG_FILE"
     return 1
-  }
-  echo "Successfully downloaded $filename"
-  return 0
+  fi
 }
 
-# Download all LoRA files
-download_file "wan-nsfw-e14-fixed.safetensors"
-download_file "big_tits_epoch_50.safetensors"
-download_file "pov_blowjob_v1.1.safetensors"
-download_file "Wan_Breast_Helper_Hearmeman.safetensors"
-download_file "wan_cowgirl_v1.3.safetensors"
-download_file "cleavage_epoch_40.safetensors"
-download_file "orgasm_e60.safetensors"
-download_file "wan_missionary_side.safetensors"
-download_file "dicks_epoch_100.safetensors"
-download_file "masturbation_cumshot_wanI2V480p_v1.safetensors"
-download_file "r0und4b0ut-wan-v1.0.safetensors"
-download_file "facials_epoch_50.safetensors"
-download_file "deepthroat_epoch_80.safetensors"
-download_file "ahegao_v1_e35_wan.safetensors"
-download_file "Wan_Pussy_LoRA_Hearmeman.safetensors"
-download_file "doggyPOV_v1_1.safetensors"
-download_file "wan_pov_missionary_v1.1.safetensors"
-download_file "Titfuck_WAN14B_V1_Release.safetensors"
-download_file "FILM_NOIR_EPOCH10.safetensors"
-download_file "BouncyWalkV01.safetensors"
-download_file "Spinning V2.safetensors"
-download_file "squish_18.safetensors"
-download_file "detailz-wan.safetensors"
-download_file "studio_ghibli_wan14b_t2v_v01.safetensors"
-download_file "Su_Bl_Ep02-Wan.safetensors"
-download_file "wan_female_masturbation.safetensors"
-download_file "Wan-Hip_Slammin_Assertive_Cowgirl.safetensors"
-download_file "T2V - Skinny Petite Instagram Women - 14B.safetensors"
-download_file "T2V-jiggle_tits-14b.safetensors"
-download_file "PPD_v-9.safetensors"
-download_file "DR34M15H_T2V_HD_v1.safetensors"
-download_file "T2V - Big Perky Breasts - 14b.safetensors"
-download_file "T2V - Bodyshots v2 - 14b.safetensors"
-download_file "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors"
-download_file "BoobPhysics_WAN_v7.safetensors"
-download_file "T2V - Dildo Masturbation - 14B.safetensors"
-download_file "sh4rpn3ss_v2_e56.safetensors"
-download_file "SU_Twrk_EP55.safetensors"
+echo "=== Starting downloads at $(date) ===" | tee -a $LOG_FILE
+echo "Download directory: $(pwd)" | tee -a $LOG_FILE
 
-echo "All LoRA files downloaded successfully"
+# Track success and failure
+total_files=0
+successful_downloads=0
+
+# Download all LoRA files - combined list from both branches
+file_list=(
+  "wan-nsfw-e14-fixed.safetensors"
+  "big_tits_epoch_50.safetensors"
+  "pov_blowjob_v1.1.safetensors"
+  "Wan_Breast_Helper_Hearmeman.safetensors"
+  "wan_cowgirl_v1.3.safetensors"
+  "cleavage_epoch_40.safetensors"
+  "orgasm_e60.safetensors"
+  "wan_missionary_side.safetensors"
+  "dicks_epoch_100.safetensors"
+  "masturbation_cumshot_v1.1_e310.safetensors"
+  "masturbation_cumshot_wanI2V480p_v1.safetensors"
+  "T2V - POV Handjob - 14b.safetensors"
+  "instagram_girls.safetensors"
+  "r0und4b0ut-wan-v1.0.safetensors"
+  "facials_epoch_50.safetensors"
+  "deepthroat_epoch_80.safetensors"
+  "ahegao_v1_e35_wan.safetensors"
+  "Wan_Pussy_LoRA_Hearmeman.safetensors"
+  "doggyPOV_v1_1.safetensors"
+  "wan_pov_missionary_v1.1.safetensors"
+  "Titfuck_WAN14B_V1_Release.safetensors"
+  "FILM_NOIR_EPOCH10.safetensors"
+  "BouncyWalkV01.safetensors"
+  "Spinning V2.safetensors"
+  "squish_18.safetensors"
+  "detailz-wan.safetensors"
+  "studio_ghibli_wan14b_t2v_v01.safetensors"
+  "Su_Bl_Ep02-Wan.safetensors"
+  "wan_female_masturbation.safetensors"
+  "Wan-Hip_Slammin_Assertive_Cowgirl.safetensors"
+  "T2V - Skinny Petite Instagram Women - 14B.safetensors"
+  "T2V-jiggle_tits-14b.safetensors"
+  "PPD_v-9.safetensors"
+  "DR34M15H_T2V_HD_v1.safetensors"
+  "T2V - Big Perky Breasts - 14b.safetensors"
+  "T2V - Bodyshots v2 - 14b.safetensors"
+  "SECRET_SAUCE_WAN2.1_14B_fp8.safetensors"
+  "BoobPhysics_WAN_v7.safetensors"
+  "T2V - Dildo Masturbation - 14B.safetensors"
+  "sh4rpn3ss_v2_e56.safetensors"
+  "SU_Twrk_EP55.safetensors"
+  "analFromBehind_T2V_e100.safetensors"
+  "jfj-deepthroat-v1.safetensors"
+  "wan-t2v-anal-reverse-cowgirl-e54.safetensors"
+  "spanking_for_wan_v1_e128.safetensors"
+  "tongue kiss.safetensors"
+  "wan_cumshot_i2v.safetensors"
+  "flaccid_penis_epoch_100.safetensors"
+  "T2V-stroking_it-14B.safetensors"
+  "fingering_i2v_e248.safetensors"
+)
+
+# Process each file
+for file in "${file_list[@]}"; do
+  total_files=$((total_files+1))
+  if download_file "$file"; then
+    successful_downloads=$((successful_downloads+1))
+  fi
+  # Add a small delay between downloads
+  sleep 1
+done
+
+# Summary
+echo "=== Download Summary ===" | tee -a $LOG_FILE
+echo "Total files: $total_files" | tee -a $LOG_FILE
+echo "Successfully downloaded: $successful_downloads" | tee -a $LOG_FILE
+echo "Failed downloads: $((total_files-successful_downloads))" | tee -a $LOG_FILE
+echo "Completed at $(date)" | tee -a $LOG_FILE
+
+# Check if all downloads were successful
+if [ $successful_downloads -eq $total_files ]; then
+  echo "✅ All LoRA files downloaded successfully" | tee -a $LOG_FILE
+  exit 0
+else
+  echo "⚠️ Some LoRA files failed to download. Check $LOG_FILE for details" | tee -a $LOG_FILE
+  # List files in directory
+  echo "Files in directory:" | tee -a $LOG_FILE
+  ls -la | tee -a $LOG_FILE
+  exit 1
+fi
